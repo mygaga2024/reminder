@@ -25,7 +25,7 @@
 ```yaml
 services:
   reminder:
-    image: ghcr.io/${YOUR_GITHUB_USERNAME}/reminder:main
+    image: ghcr.io/mygaga2024/longlive:main
     ports:
       - "5000:5000"
     volumes:
