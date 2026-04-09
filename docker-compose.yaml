@@ -1,24 +1,14 @@
 services:
   reminder:
+    # 推荐：开发时使用 build，生产时可改为 image: ghcr.io/mygaga2024/reminder:v1.0.1
     build: .
-    container_name: reminder-container
+    container_name: reminder
     restart: always
     environment:
       - TZ=Asia/Shanghai
-      # 设置容器内部服务端口 (默认 5000)
-      - APP_PORT=5000
-      # 支持三种格式：
-      # 1. 每日定时: "HH:MM:SS"
-      # 2. 周期提醒: "mon-fri 09:00:00"
-      # 3. 指定日期: "2026-04-10 10:00:00"
-      - REMINDER_RULES=09:00:00, mon-fri 12:00:00, 2026-04-10 18:30:00
-      - EMAIL_ENABLED=False
-      - EMAIL_SENDER=your-email@example.com
-      - EMAIL_PASSWORD=your-password
-      - PUSH_ENABLED=False
-      - PUSH_WEBHOOK_URL=https://example.com/webhook
+      # 提醒规则：09:00:00, mon-fri 12:00:00, 2026-04-10 18:30:00 等
+      - REMINDER_RULES=09:00:00
     ports:
-      # 如果想在外部使用 8080 端口，改为 "8080:5000"
       - "5000:5000"
     volumes:
       - ./data:/app/data
