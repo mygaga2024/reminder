@@ -1,0 +1,18 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data and logs
+data/
+*.log
+reminder_history.json
+
+# Environment variables
+.env
+
+# IDEs
+.vscode/
+.idea/
+.trae/
+.DS_Store
