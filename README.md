@@ -25,7 +25,7 @@
 ```yaml
 services:
   reminder:
-    image: ghcr.io/mygaga2024/reminder:v1.0.0
+    image: ghcr.io/mygaga2024/reminder:v1.0.1
     ports:
       - "5000:5000"
     volumes:
@@ -33,7 +33,6 @@ services:
     environment:
       - TZ=Asia/Shanghai
 ```
-*注：请将 `${YOUR_GITHUB_USERNAME}` 替换为你的 GitHub 用户名。*
 
 #### 方式 B：从源码构建运行
 ```bash
@@ -42,7 +41,7 @@ docker compose up -d --build
 
 ### 3. 查看日志
 ```bash
-docker logs -f reminder-container
+docker logs -f reminder
 ```
 
 ## 目录结构
