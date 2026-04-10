@@ -217,6 +217,8 @@ def get_logs():
     return jsonify(reminder_logs)
 
 if __name__ == "__main__":
+    from waitress import serve
     update_scheduler()
     port = int(os.getenv("APP_PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    logger.info(f"Starting Pro Reminder Server on port {port}...")
+    serve(app, host="0.0.0.0", port=port)
