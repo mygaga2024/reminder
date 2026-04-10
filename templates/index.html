@@ -183,6 +183,7 @@ input, select, button, textarea { font-family: inherit; }
     transition: var(--transition);
     position: relative;
     overflow: hidden;
+    cursor: grab;
 }
 .task::before {
     content: ''; position: absolute; left: 0; top: 0; bottom: 0;
@@ -192,23 +193,27 @@ input, select, button, textarea { font-family: inherit; }
 .task.pri-mid::before  { background: var(--c-orange); }
 .task.pri-low::before  { background: var(--c-green); }
 .task:active { transform: scale(0.98); background: var(--c-surface2); }
-.task.done { opacity: 0.35; }
+.task.done { opacity: 0.4; }
 .task.done .task-title { text-decoration: line-through; }
+.task.dragging { opacity: 0.5; border-style: dashed; }
 
 .task-body { flex: 1; min-width: 0; }
 .task-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.task-sub { font-size: 0.75rem; color: var(--c-text3); display: flex; align-items: center; gap: 6px; }
+.task-sub { font-size: 0.75rem; color: var(--c-text3); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
-.task-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.task-actions { display: flex; gap: 4px; flex-shrink: 0; }
 .act-btn {
-    width: 34px; height: 34px; border-radius: 10px; border: none;
+    width: 32px; height: 32px; border-radius: 10px; border: none;
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: var(--transition); font-size: 0.85rem;
+    cursor: pointer; transition: var(--transition); font-size: 0.8rem;
     background: transparent; color: var(--c-text3);
 }
 .act-btn:hover { background: var(--c-surface2); }
 .act-btn.check  { color: var(--c-green); }
+.act-btn.check.checked { color: var(--c-text3); }
+.act-btn.edit   { color: var(--c-blue); }
 .act-btn.delete { color: var(--c-red); }
+.drag-handle { color: var(--c-text3); font-size: 0.75rem; cursor: grab; padding: 4px; opacity: 0.4; }
 
 .empty-state {
     text-align: center; padding: 60px 20px; color: var(--c-text3);
@@ -217,7 +222,7 @@ input, select, button, textarea { font-family: inherit; }
 .empty-state p { font-size: 0.9rem; }
 
 /* ═══════════════════════════════════════════
-   Components — Stats
+   Components — Stats / Log Actions
    ═══════════════════════════════════════════ */
 .chart-wrap {
     background: var(--c-surface);
@@ -229,19 +234,24 @@ input, select, button, textarea { font-family: inherit; }
 .chart-wrap h4 { font-size: 0.75rem; color: var(--c-text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
 
 .log-entry {
-    display: flex; align-items: center; gap: 14px;
-    padding: 14px 0;
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0;
     border-bottom: 1px solid var(--c-border);
+    transition: var(--transition);
 }
+.log-entry.hidden-log { display: none; }
 .log-icon {
-    width: 40px; height: 40px; border-radius: 12px;
+    width: 38px; height: 38px; border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 0.9rem; flex-shrink: 0;
+    font-size: 0.85rem; flex-shrink: 0;
 }
 .log-icon.triggered { background: rgba(10,132,255,0.12); color: var(--c-blue); }
 .log-icon.completed { background: rgba(48,209,88,0.12); color: var(--c-green); }
-.log-body h4 { font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; }
-.log-body p  { font-size: 0.75rem; color: var(--c-text3); }
+.log-body { flex: 1; min-width: 0; }
+.log-body h4 { font-weight: 600; font-size: 0.85rem; margin-bottom: 2px; }
+.log-body p  { font-size: 0.72rem; color: var(--c-text3); }
+.log-actions { display: flex; gap: 2px; flex-shrink: 0; }
+.log-actions .act-btn { width: 28px; height: 28px; font-size: 0.7rem; }
 
 /* ═══════════════════════════════════════════
    Components — Terminal
@@ -378,11 +388,20 @@ input, select, button, textarea { font-family: inherit; }
     padding: 12px 28px 40px;
     display: none;
     animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 85vh;
+    overflow-y: auto;
 }
 @keyframes slideUp { from { transform: translate(-50%, 100%); } to { transform: translate(-50%, 0); } }
 
-.sheet-handle { width: 36px; height: 5px; background: var(--c-surface2); border-radius: 3px; margin: 0 auto 24px; }
-.sheet-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 24px; }
+.sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.sheet-title { font-size: 1.2rem; font-weight: 700; }
+.sheet-close {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--c-surface2); border: none; color: var(--c-text3);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 0.8rem; transition: var(--transition);
+}
+.sheet-close:active { transform: scale(0.9); }
 
 .field { margin-bottom: 20px; }
 .field label { display: block; font-size: 0.72rem; font-weight: 700; color: var(--c-text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
@@ -393,6 +412,16 @@ input, select, button, textarea { font-family: inherit; }
     transition: var(--transition);
 }
 .field input:focus, .field select:focus { border-color: var(--c-blue); box-shadow: 0 0 0 3px rgba(10,132,255,0.15); }
+
+/* Schedule Chips */
+.chip-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+    padding: 8px 16px; border-radius: 100px;
+    background: var(--c-bg); border: 1px solid var(--c-border);
+    font-size: 0.8rem; font-weight: 600; color: var(--c-text2);
+    cursor: pointer; transition: var(--transition); user-select: none;
+}
+.chip.active { background: var(--c-blue); color: #fff; border-color: var(--c-blue); }
 
 .btn-submit {
     width: 100%; padding: 16px; border: none; border-radius: 14px;
@@ -525,9 +554,12 @@ input, select, button, textarea { font-family: inherit; }
 
 <!-- ═══ Bottom Sheets ═══ -->
 <div class="sheet-overlay" id="overlay" onclick="closeSheet()">
+    <!-- Add / Edit Sheet -->
     <div class="sheet-panel" id="sheet-add" onclick="event.stopPropagation()">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title">新建任务</div>
+        <div class="sheet-header">
+            <div class="sheet-title" id="addSheetTitle">新建任务</div>
+            <button class="sheet-close" onclick="closeSheet()"><i class="fas fa-xmark"></i></button>
+        </div>
         <div class="field">
             <label>任务名称</label>
             <input type="text" id="f_title" placeholder="例如：每日运动">
@@ -546,12 +578,41 @@ input, select, button, textarea { font-family: inherit; }
                 </select>
             </div>
         </div>
+        <div class="field">
+            <label>重复模式</label>
+            <div class="chip-group" id="repeatMode">
+                <div class="chip active" data-val="daily" onclick="pickRepeat(this)">每天</div>
+                <div class="chip" data-val="workday" onclick="pickRepeat(this)">工作日</div>
+                <div class="chip" data-val="weekly" onclick="pickRepeat(this)">自选星期</div>
+                <div class="chip" data-val="once" onclick="pickRepeat(this)">仅一次</div>
+            </div>
+        </div>
+        <div class="field" id="weekdayField" style="display:none">
+            <label>选择星期（可多选）</label>
+            <div class="chip-group" id="weekdayPicker">
+                <div class="chip" data-val="mon" onclick="this.classList.toggle('active')">一</div>
+                <div class="chip" data-val="tue" onclick="this.classList.toggle('active')">二</div>
+                <div class="chip" data-val="wed" onclick="this.classList.toggle('active')">三</div>
+                <div class="chip" data-val="thu" onclick="this.classList.toggle('active')">四</div>
+                <div class="chip" data-val="fri" onclick="this.classList.toggle('active')">五</div>
+                <div class="chip" data-val="sat" onclick="this.classList.toggle('active')">六</div>
+                <div class="chip" data-val="sun" onclick="this.classList.toggle('active')">日</div>
+            </div>
+        </div>
+        <div class="field" id="dateField" style="display:none">
+            <label>选择日期</label>
+            <input type="date" id="f_date">
+        </div>
+        <input type="hidden" id="f_editId" value="">
         <button class="btn-submit" onclick="createTask()">创建提醒</button>
     </div>
 
+    <!-- Webhook Sheet -->
     <div class="sheet-panel" id="sheet-webhook" onclick="event.stopPropagation()">
-        <div class="sheet-handle"></div>
-        <div class="sheet-title">推送配置</div>
+        <div class="sheet-header">
+            <div class="sheet-title">推送配置</div>
+            <button class="sheet-close" onclick="closeSheet()"><i class="fas fa-xmark"></i></button>
+        </div>
         <div class="field">
             <label>企业微信 Webhook</label>
             <input type="text" id="w_wecom" placeholder="https://qyapi.weixin.qq.com/...">
@@ -574,6 +635,7 @@ input, select, button, textarea { font-family: inherit; }
 <script>
 let S = null; // global state
 let weekChart = null;
+let hiddenLogs = new Set(); // track hidden log IDs locally
 
 // ─── Clock ───
 function tickClock() {
@@ -625,12 +687,27 @@ function paintHome() {
         return;
     }
 
-    container.innerHTML = all.sort((a,b) => {
+    // Build repeat label
+    function repeatLabel(r) {
+        const rep = r.repeat || 'daily';
+        if (rep === 'daily') return '每天';
+        if (rep === 'workday') return '工作日';
+        if (rep === 'once') return '仅一次';
+        if (rep.startsWith('weekly:')) return '每周' + rep.split(':')[1].split(',').map(d => ({mon:'一',tue:'二',wed:'三',thu:'四',fri:'五',sat:'六',sun:'日'}[d]||d)).join('、');
+        return rep;
+    }
+
+    const sorted = all.slice().sort((a,b) => {
         if (a.status === 'completed' && b.status !== 'completed') return 1;
         if (a.status !== 'completed' && b.status === 'completed') return -1;
         return a.time.localeCompare(b.time);
-    }).map(r => `
-        <div class="task pri-${r.priority || 'low'} ${r.status==='completed'?'done':''}">
+    });
+
+    container.innerHTML = sorted.map((r, idx) => `
+        <div class="task pri-${r.priority || 'low'} ${r.status==='completed'?'done':''}"
+             draggable="true" data-id="${r.id}" data-idx="${idx}"
+             ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dropTask(event)" ondragend="dragEnd(event)">
+            <div class="drag-handle"><i class="fas fa-grip-vertical"></i></div>
             <div class="task-body">
                 <div class="task-title">${r.title}</div>
                 <div class="task-sub">
@@ -638,14 +715,84 @@ function paintHome() {
                     <span style="color:var(--c-${r.priority==='high'?'red':r.priority==='mid'?'orange':'green'}); font-weight:600;">
                         ${r.priority==='high'?'紧急':r.priority==='mid'?'重要':'普通'}
                     </span>
+                    · ${repeatLabel(r)}
                 </div>
             </div>
             <div class="task-actions">
-                ${r.status !== 'completed' ? `<button class="act-btn check" onclick="doAction('${r.id}','toggle')"><i class="fas fa-check"></i></button>` : ''}
+                <button class="act-btn check ${r.status==='completed'?'checked':''}" onclick="toggleStatus('${r.id}','${r.status}')">
+                    <i class="fas fa-${r.status==='completed'?'rotate-left':'check'}"></i>
+                </button>
+                <button class="act-btn edit" onclick="editTask('${r.id}')"><i class="fas fa-pen"></i></button>
                 <button class="act-btn delete" onclick="doAction('${r.id}','delete')"><i class="fas fa-trash-can"></i></button>
             </div>
         </div>
     `).join('');
+}
+
+// ─── Drag & Drop Sort ───
+let dragSrcId = null;
+function dragStart(e) {
+    dragSrcId = e.currentTarget.dataset.id;
+    e.currentTarget.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+function dragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function dropTask(e) {
+    e.preventDefault();
+    const targetId = e.currentTarget.dataset.id;
+    if (dragSrcId && targetId && dragSrcId !== targetId) {
+        const arr = S.db.reminders;
+        const srcIdx = arr.findIndex(r => r.id === dragSrcId);
+        const tgtIdx = arr.findIndex(r => r.id === targetId);
+        if (srcIdx > -1 && tgtIdx > -1) {
+            const [item] = arr.splice(srcIdx, 1);
+            arr.splice(tgtIdx, 0, item);
+            paintHome(); // local reorder (visual only — order persists via next save)
+        }
+    }
+}
+function dragEnd(e) { e.currentTarget.classList.remove('dragging'); dragSrcId = null; }
+
+// ─── Toggle Complete / Uncomplete (需求3) ───
+async function toggleStatus(id, currentStatus) {
+    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+    await fetch(`/api/reminders/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+    });
+    sync();
+}
+
+// ─── Edit Task (需求2) ───
+function editTask(id) {
+    const r = S.db.reminders.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('f_editId').value = r.id;
+    document.getElementById('f_title').value = r.title;
+    document.getElementById('f_time').value = r.time;
+    document.getElementById('f_prio').value = r.priority || 'low';
+    document.getElementById('addSheetTitle').textContent = '编辑任务';
+    document.querySelector('#sheet-add .btn-submit').textContent = '保存修改';
+
+    // Restore repeat mode
+    const rep = r.repeat || 'daily';
+    document.querySelectorAll('#repeatMode .chip').forEach(c => c.classList.remove('active'));
+    if (rep === 'daily' || rep === 'workday' || rep === 'once') {
+        document.querySelector(`#repeatMode .chip[data-val="${rep}"]`).classList.add('active');
+        document.getElementById('weekdayField').style.display = 'none';
+        document.getElementById('dateField').style.display = rep === 'once' ? 'block' : 'none';
+    } else if (rep.startsWith('weekly:')) {
+        document.querySelector('#repeatMode .chip[data-val="weekly"]').classList.add('active');
+        document.getElementById('weekdayField').style.display = 'block';
+        document.getElementById('dateField').style.display = 'none';
+        const days = rep.split(':')[1].split(',');
+        document.querySelectorAll('#weekdayPicker .chip').forEach(c => {
+            c.classList.toggle('active', days.includes(c.dataset.val));
+        });
+    }
+
+    openSheet('add');
 }
 
 // ─── Data View ───
@@ -654,11 +801,10 @@ function paintData() {
     const ctx = document.getElementById('weekChart').getContext('2d');
     if (weekChart) weekChart.destroy();
 
-    // Compute real data from logs by day-of-week
     const counts = [0,0,0,0,0,0,0];
     S.logs.forEach(l => {
         if (l.triggered_at) {
-            const d = new Date(l.triggered_at).getDay(); // 0=Sun
+            const d = new Date(l.triggered_at).getDay();
             counts[d === 0 ? 6 : d - 1]++;
         }
     });
@@ -684,7 +830,7 @@ function paintData() {
         }
     });
 
-    // Log List
+    // Log List with action buttons (需求1)
     const logC = document.getElementById('logContainer');
     const logs = S.logs.slice().reverse();
     if (logs.length === 0) {
@@ -692,7 +838,7 @@ function paintData() {
         return;
     }
     logC.innerHTML = logs.map(l => `
-        <div class="log-entry">
+        <div class="log-entry ${hiddenLogs.has(l.id) ? 'hidden-log' : ''}" id="log-${l.id}">
             <div class="log-icon ${l.completed_at ? 'completed' : 'triggered'}">
                 <i class="fas fa-${l.completed_at ? 'check' : 'bell'}"></i>
             </div>
@@ -700,8 +846,32 @@ function paintData() {
                 <h4>${l.title}</h4>
                 <p>${new Date(l.triggered_at).toLocaleString('zh-CN')} · ${l.completed_at ? '已处理' : '已通知'}</p>
             </div>
+            <div class="log-actions">
+                <button class="act-btn" title="隐藏" onclick="hideLog('${l.id}')"><i class="fas fa-eye-slash"></i></button>
+                <button class="act-btn" title="复用" onclick="reuseLog('${l.title}')"><i class="fas fa-copy"></i></button>
+                <button class="act-btn delete" title="删除" onclick="deleteLog('${l.id}')"><i class="fas fa-trash-can"></i></button>
+            </div>
         </div>
     `).join('');
+}
+
+// ─── Log Actions (需求1) ───
+function hideLog(id) {
+    hiddenLogs.add(id);
+    const el = document.getElementById('log-' + id);
+    if (el) { el.style.transition = '0.3s'; el.style.opacity = '0'; el.style.maxHeight = '0'; el.style.padding = '0'; el.style.overflow = 'hidden'; setTimeout(() => el.classList.add('hidden-log'), 300); }
+}
+function reuseLog(title) {
+    document.getElementById('f_editId').value = '';
+    document.getElementById('f_title').value = title;
+    document.getElementById('addSheetTitle').textContent = '新建任务';
+    document.querySelector('#sheet-add .btn-submit').textContent = '创建提醒';
+    openSheet('add');
+}
+async function deleteLog(id) {
+    if (!confirm('确认删除该记录？')) return;
+    S.logs = S.logs.filter(l => l.id !== id);
+    paintData();
 }
 
 // ─── System Logs ───
@@ -722,7 +892,6 @@ function paintSettings() {
     document.getElementById('darkToggle').className = 'toggle' + (dark ? ' on' : '');
     document.getElementById('darkDesc').textContent = dark ? '当前已开启' : '当前已关闭';
 
-    // Fill webhook fields
     const wh = S.db.settings.webhooks || {};
     document.getElementById('w_wecom').value = wh.wecom || '';
     document.getElementById('w_ding').value = wh.dingtalk || '';
@@ -740,18 +909,56 @@ async function doAction(id, type) {
     sync();
 }
 
+// ─── Repeat Mode Toggle (需求5) ───
+function pickRepeat(el) {
+    el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    const val = el.dataset.val;
+    document.getElementById('weekdayField').style.display = val === 'weekly' ? 'block' : 'none';
+    document.getElementById('dateField').style.display = val === 'once' ? 'block' : 'none';
+}
+
+// ─── Create / Update Task ───
 async function createTask() {
+    const editId = document.getElementById('f_editId').value;
     const title = document.getElementById('f_title').value.trim();
     const time = document.getElementById('f_time').value;
     const prio = document.getElementById('f_prio').value;
+
     if (!title) { document.getElementById('f_title').style.borderColor = 'var(--c-red)'; return; }
-    await fetch('/api/reminders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, time, priority: prio, repeat: 'daily', category: 'work' })
-    });
+
+    // Build repeat string
+    const mode = document.querySelector('#repeatMode .active').dataset.val;
+    let repeat = mode;
+    if (mode === 'weekly') {
+        const days = Array.from(document.querySelectorAll('#weekdayPicker .active')).map(c => c.dataset.val);
+        repeat = days.length > 0 ? 'weekly:' + days.join(',') : 'daily';
+    }
+
+    if (editId) {
+        // Update existing
+        await fetch(`/api/reminders/${editId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, time, priority: prio, repeat })
+        });
+    } else {
+        // Create new
+        await fetch('/api/reminders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, time, priority: prio, repeat, category: 'work' })
+        });
+    }
+
+    // Reset form
     document.getElementById('f_title').value = '';
-    closeSheet(); sync();
+    document.getElementById('f_title').style.borderColor = '';
+    document.getElementById('f_editId').value = '';
+    closeSheet();
+    await sync();
+    // 需求6: 创建后跳转到首页
+    goTo('home', document.querySelector('.dock-btn'));
 }
 
 async function saveWebhooks() {
@@ -788,12 +995,24 @@ function goTo(id, el) {
 
 // ─── Sheets ───
 function openSheet(id) {
+    // Reset add sheet to "create" mode when opening fresh
+    if (id === 'add' && !document.getElementById('f_editId').value) {
+        document.getElementById('addSheetTitle').textContent = '新建任务';
+        document.querySelector('#sheet-add .btn-submit').textContent = '创建提醒';
+        // Reset repeat chips
+        document.querySelectorAll('#repeatMode .chip').forEach(c => c.classList.remove('active'));
+        document.querySelector('#repeatMode .chip[data-val="daily"]').classList.add('active');
+        document.getElementById('weekdayField').style.display = 'none';
+        document.getElementById('dateField').style.display = 'none';
+        document.querySelectorAll('#weekdayPicker .chip').forEach(c => c.classList.remove('active'));
+    }
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('sheet-' + id).style.display = 'block';
 }
 function closeSheet() {
     document.getElementById('overlay').style.display = 'none';
     document.querySelectorAll('.sheet-panel').forEach(s => s.style.display = 'none');
+    document.getElementById('f_editId').value = '';
 }
 
 // ─── Bootstrap ───
