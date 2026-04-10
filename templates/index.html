@@ -584,7 +584,7 @@ input, select, button, textarea { font-family: inherit; }
             </div>
 
             <div class="footer-info">
-                Life Reminder v3.0.0<br>
+                Life Reminder v3.0.1<br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -623,7 +623,7 @@ input, select, button, textarea { font-family: inherit; }
                         <select id="tp_hour" class="tp-list" size="5"></select>
                         <select id="tp_min" class="tp-list" size="5"></select>
                     </div>
-                    <button class="cal-btn-confirm" style="width:100%; padding:12px; border:none; border-radius:10px; font-weight:600; cursor:pointer;" onclick="confirmTime()">确定时间</button>
+                    <button class="cal-btn-confirm" style="width:100%; padding:12px; border:none; border-radius:10px; font-weight:600; cursor:pointer;" onclick="confirmTime()">确定</button>
                 </div>
             </div>
             <div class="field" style="flex:1">
@@ -953,7 +953,7 @@ function paintData() {
 function hideLog(id) {
     hiddenLogs.add(id);
     const el = document.getElementById('log-' + id);
-    if (el) { el.style.transition = '0.3s'; el.style.opacity = '0'; el.style.maxHeight = '0'; el.style.padding = '0'; el.style.overflow = 'hidden'; setTimeout(() => el.classList.add('hidden-log'), 300); }
+    if (el) el.classList.add('hidden-log');
 }
 function reuseLog(title) {
     document.getElementById('f_editId').value = '';
