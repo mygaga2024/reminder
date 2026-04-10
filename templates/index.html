@@ -581,10 +581,17 @@ input, select, button, textarea { font-family: inherit; }
                     </div>
                     <div class="set-right"><i class="fas fa-chevron-right"></i></div>
                 </div>
+                <div class="set-item" onclick="openSheet('smsvoice')">
+                    <div class="set-left">
+                        <div class="set-icon" style="background:rgba(48,209,88,0.12); color:var(--c-green)"><i class="fas fa-tower-cell"></i></div>
+                        <div class="set-label"><h4>短信 / 电话</h4><p>紧急通知接入</p></div>
+                    </div>
+                    <div class="set-right"><i class="fas fa-chevron-right"></i></div>
+                </div>
             </div>
 
             <div class="footer-info">
-                Life Reminder v3.0.1<br>
+                Life Reminder v3.0.2<br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -687,6 +694,37 @@ input, select, button, textarea { font-family: inherit; }
             3. 找到「群机器人」，点击「添加」<br>
             4. 命名并添加后，复制 Webhook 地址<br>
             5. 将地址粘贴到上方输入框中保存体验
+        </div>
+    </div>
+
+    <!-- SMS/Voice Sheet -->
+    <div class="sheet-panel" id="sheet-smsvoice" onclick="event.stopPropagation()">
+        <div class="sheet-header">
+            <div class="sheet-title">短信 / 电话配置</div>
+            <button class="sheet-close" onclick="closeSheet()"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="field">
+            <label>接收手机号</label>
+            <input type="text" id="w_sms_phone" placeholder="例如：+8613800138000">
+        </div>
+        <div class="field">
+            <label>短信 API Webhook</label>
+            <input type="text" id="w_sms_api" placeholder="提供您的三方短信网关API...">
+        </div>
+        <div class="field">
+            <label>语音电话 API Webhook</label>
+            <input type="text" id="w_voice_api" placeholder="提供您的三方语音网关API...">
+        </div>
+        <button class="btn-submit" onclick="saveWebhooks()">保存</button>
+        <div style="margin-top:20px; font-size:0.8rem; text-align:center;">
+            <a href="javascript:void(0)" onclick="document.getElementById('help-smsvoice').style.display='block'; this.style.display='none'" style="color:var(--c-blue); text-decoration:none;">如何配置？</a>
+        </div>
+        <div id="help-smsvoice" style="display:none; margin-top:16px; font-size:0.8rem; color:var(--c-text3); line-height:1.6; background:var(--c-surface2); padding:12px; border-radius:12px; text-align:left;">
+            <strong>配置步骤：</strong><br>
+            目前系统支持将紧急提醒路由至第三方通讯网关（例如 Twilio、阿里云短信/语音等）。<br><br>
+            1. 在上方输入您的<strong>接收手机号</strong>，建议包含国家区号（如 +86）。<br>
+            2. 将对应的<strong>短信API</strong>或<strong>电话API</strong>调用接口（含鉴权Key）填入下方输入框中。<br>
+            3. 触发对应级别的提醒并符合调度策略时，即可在此通道推送。
         </div>
     </div>
 
@@ -1012,6 +1050,9 @@ function paintSettings() {
     document.getElementById('w_wecom').value = wh.wecom || '';
     document.getElementById('w_ding').value = wh.dingtalk || '';
     document.getElementById('w_lark').value = wh.lark || '';
+    document.getElementById('w_sms_phone').value = wh.sms_phone || '';
+    document.getElementById('w_sms_api').value = wh.sms_api || '';
+    document.getElementById('w_voice_api').value = wh.voice_api || '';
 }
 
 // ─── Actions ───
@@ -1199,7 +1240,10 @@ async function saveWebhooks() {
             webhooks: {
                 wecom: document.getElementById('w_wecom').value,
                 dingtalk: document.getElementById('w_ding').value,
-                lark: document.getElementById('w_lark').value
+                lark: document.getElementById('w_lark').value,
+                sms_phone: document.getElementById('w_sms_phone').value,
+                sms_api: document.getElementById('w_sms_api').value,
+                voice_api: document.getElementById('w_voice_api').value
             }
         })
     });
