@@ -549,14 +549,14 @@ input, select, button, textarea { font-family: inherit; }
             </div>
 
             <div class="settings-group">
-                <div class="set-item" onclick="openSheet('webhook')">
+                <div class="set-item" onclick="openSheet('wecom')">
                     <div class="set-left">
                         <div class="set-icon" style="background:rgba(10,132,255,0.12); color:var(--c-blue)"><i class="fas fa-link"></i></div>
                         <div class="set-label"><h4>企业微信</h4><p>Webhook 推送配置</p></div>
                     </div>
                     <div class="set-right"><i class="fas fa-chevron-right"></i></div>
                 </div>
-                <div class="set-item" onclick="openSheet('webhook')">
+                <div class="set-item" onclick="openSheet('dinglark')">
                     <div class="set-left">
                         <div class="set-icon" style="background:rgba(255,159,10,0.12); color:var(--c-orange)"><i class="fab fa-slack"></i></div>
                         <div class="set-label"><h4>钉钉 / 飞书</h4><p>机器人接入</p></div>
@@ -599,7 +599,7 @@ input, select, button, textarea { font-family: inherit; }
         <div style="display:flex; gap:12px">
             <div class="field" style="flex:1">
                 <label>提醒时间</label>
-                <input type="time" id="f_time" value="09:00">
+                <input type="time" id="f_time" value="09:00" onchange="this.blur()">
             </div>
             <div class="field" style="flex:1">
                 <label>优先级</label>
@@ -641,14 +641,35 @@ input, select, button, textarea { font-family: inherit; }
     </div>
 
     <!-- Webhook Sheet -->
-    <div class="sheet-panel" id="sheet-webhook" onclick="event.stopPropagation()">
+    <!-- Wecom Sheet -->
+    <div class="sheet-panel" id="sheet-wecom" onclick="event.stopPropagation()">
         <div class="sheet-header">
-            <div class="sheet-title">推送配置</div>
+            <div class="sheet-title">企业微信推送配置</div>
             <button class="sheet-close" onclick="closeSheet()"><i class="fas fa-xmark"></i></button>
         </div>
         <div class="field">
             <label>企业微信 Webhook</label>
             <input type="text" id="w_wecom" placeholder="https://qyapi.weixin.qq.com/...">
+        </div>
+        <button class="btn-submit" onclick="saveWebhooks()">保存</button>
+        <div style="margin-top:20px; font-size:0.8rem; text-align:center;">
+            <a href="javascript:void(0)" onclick="document.getElementById('help-wecom').style.display='block'; this.style.display='none'" style="color:var(--c-blue); text-decoration:none;">如何配置？</a>
+        </div>
+        <div id="help-wecom" style="display:none; margin-top:16px; font-size:0.8rem; color:var(--c-text3); line-height:1.6; background:var(--c-surface2); padding:12px; border-radius:12px; text-align:left;">
+            <strong>配置步骤：</strong><br>
+            1. 打开企业微信，进入目标群聊<br>
+            2. 点击右上角「...」打开群设置<br>
+            3. 找到「群机器人」，点击「添加」<br>
+            4. 命名并添加后，复制 Webhook 地址<br>
+            5. 将地址粘贴到上方输入框中保存体验
+        </div>
+    </div>
+
+    <!-- Dingtalk/Lark Sheet -->
+    <div class="sheet-panel" id="sheet-dinglark" onclick="event.stopPropagation()">
+        <div class="sheet-header">
+            <div class="sheet-title">钉钉/飞书推送配置</div>
+            <button class="sheet-close" onclick="closeSheet()"><i class="fas fa-xmark"></i></button>
         </div>
         <div class="field">
             <label>钉钉 Webhook</label>
@@ -659,6 +680,21 @@ input, select, button, textarea { font-family: inherit; }
             <input type="text" id="w_lark" placeholder="https://open.feishu.cn/...">
         </div>
         <button class="btn-submit" onclick="saveWebhooks()">保存</button>
+        <div style="margin-top:20px; font-size:0.8rem; text-align:center;">
+            <a href="javascript:void(0)" onclick="document.getElementById('help-dinglark').style.display='block'; this.style.display='none'" style="color:var(--c-blue); text-decoration:none;">如何配置？</a>
+        </div>
+        <div id="help-dinglark" style="display:none; margin-top:16px; font-size:0.8rem; color:var(--c-text3); line-height:1.6; background:var(--c-surface2); padding:12px; border-radius:12px; text-align:left;">
+            <strong>配置步骤：</strong><br>
+            <br>
+            <strong>钉钉：</strong><br>
+            1. 打开电脑版钉钉，进入群聊并且点击右上角「群设置」<br>
+            2. 选择「智能群助手」->「添加机器人」->「自定义」<br>
+            3. 同意协议，选择相应安全设置，并复制 Webhook 地址<br><br>
+            <strong>飞书：</strong><br>
+            1. 打开飞书群聊，点击右上角设置图标进入「群设置」<br>
+            2. 点击「群机器人」->「添加机器人」，选择「自定义机器人」<br>
+            3. 配置名称和安全设置后，复制 Webhook 地址
+        </div>
     </div>
 </div>
 
@@ -915,7 +951,7 @@ function toggleHiddenLogs() {
     const btn = document.getElementById('toggleHiddenBtn');
     if (showHidden) {
         container.classList.add('show-hidden');
-        btn.textContent = '隐藏已隐藏';
+        btn.textContent = '隐藏';
     } else {
         container.classList.remove('show-hidden');
         btn.textContent = '显示已隐藏';
