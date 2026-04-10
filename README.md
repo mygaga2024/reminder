@@ -1,32 +1,27 @@
-# 定时提醒助手 (Reminder Service)
+# Life Reminder Pro (定时提醒助手)
 
-这是一个基于 Python 和 Docker 的轻量级定时提醒服务。
+🚀 **一个基于 Python 和 Docker 的高颜值、多功能生活提醒系统。**
 
-## 功能特点
-- **灵活定时**：支持多个时间点触发，支持 **秒级精度**。
-- **多种模式**：
-  - **每日** (Daily): `09:00:00`
-  - **每周/工作日** (Weekly/Weekday): `mon-fri 09:00:00`
-  - **特定日期** (Specific Date): `2026-04-10 10:00:00`
-- **多种通知**：支持邮件提醒和 Webhook 推送。
-- **持久化**：自动记录提醒历史，保留在本地 `./data` 目录。
+## ✨ 核心特性
 
-## 快速开始
+- **专业级 UI/UX**：美观的 Glassmorphism 设计，支持 **黑暗模式 (Dark Mode)**。
+- **多渠道推送**：支持 **企业微信、钉钉、飞书、邮件** 以及 **浏览器弹窗**。
+- **执行日志 (Journal)**：内置统计图表，记录提醒的触发和实际完成情况，助力提升执行力。
+- **多语言支持**：支持 **简体中文** 与 **English** 一键切换。
+- **智能识别 (NLP)**：支持通过自然语言（如 "下午三点提醒我"）自动解析时间。
+- **高度便携**：一键 Docker 部署，所有配置通过 Web 界面完成。
 
-### 1. 配置
-编辑 `docker-compose.yaml` 中的 `environment` 部分，修改 `REMINDER_RULES`：
-- 支持逗号分隔多个规则。
-- 星期支持缩写 (mon, tue, wed, thu, fri, sat, sun) 或范围 (mon-fri)。
+## 🛠 快速开始
 
-### 2. 运行
+### 方式 A：直接运行 (推荐)
+只需创建一个 `docker-compose.yaml` 文件，内容如下：
 
-#### 方式 A：直接拉取预构建镜像 (推荐)
-如果你不想下载源码，可以直接创建一个 `docker-compose.yaml` 并填入以下内容：
 ```yaml
 services:
   reminder:
-    image: ghcr.io/mygaga2024/reminder:v1.2.0
+    image: ghcr.io/mygaga2024/reminder:latest
     container_name: reminder
+    restart: always
     ports:
       - "5000:5000"
     volumes:
@@ -35,19 +30,22 @@ services:
       - TZ=Asia/Shanghai
 ```
 
-#### 方式 B：从源码构建运行
+执行启动命令：
 ```bash
+docker compose up -d
+```
+
+### 方式 B：从源码构建
+```bash
+git clone https://github.com/mygaga2024/reminder.git
+cd reminder
 docker compose up -d --build
 ```
 
-### 3. 查看日志
-```bash
-docker logs -f reminder
-```
+## 📖 使用指南
+1. 访问 `http://localhost:5000` 进入管理面板。
+2. 在 **设置** 中配置你的 Webhook 机器人或邮箱。
+3. 在 **主页** 点击右上角 `+` 号，即可创建你的第一个智能提醒。
 
-## 目录结构
-- `reminder.py`: 核心逻辑脚本。
-- `Dockerfile`: 容器镜像定义。
-- `docker-compose.yaml`: 容器编排配置。
-- `data/`: 存储提醒历史纪录。
-- `requirements.txt`: Python 依赖。
+---
+*Created by [mygaga2024](https://github.com/mygaga2024)*
