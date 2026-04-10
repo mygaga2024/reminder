@@ -1,13 +1,12 @@
 services:
   reminder:
-    # 推荐：开发时使用 build，生产时可改为 image: ghcr.io/mygaga2024/reminder:v1.0.1
-    build: .
+    # 强制拉取云端镜像
+    image: ghcr.io/mygaga2024/reminder:v1.2.0
+    # 强制锁死容器名，防止生成 reminder-reminder-1
     container_name: reminder
     restart: always
     environment:
       - TZ=Asia/Shanghai
-      # 提醒规则：09:00:00, mon-fri 12:00:00, 2026-04-10 18:30:00 等
-      - REMINDER_RULES=09:00:00
     ports:
       - "5000:5000"
     volumes:
