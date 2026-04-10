@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Reminder | Smart Experience</title>
+    <title>Life Reminder</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -50,317 +50,355 @@
             z-index: 10;
         }
 
-        .screen { flex: 1; overflow-y: auto; padding: 24px; padding-bottom: 100px; scroll-behavior: smooth; }
+        .screen { flex: 1; overflow-y: auto; padding: 24px; padding-bottom: 110px; scroll-behavior: smooth; }
         .view { display: none; }
-        .view.active { display: block; animation: viewIn 0.5s cubic-bezier(0.19, 1, 0.22, 1); }
-        @keyframes viewIn { from { opacity: 0; transform: scale(0.96) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .view.active { display: block; animation: viewIn 0.4s ease-out; }
+        @keyframes viewIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Typography & Components */
+        /* Typography */
         .h-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.5px; }
-        .badge { padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; background: var(--primary-light); color: var(--primary); }
+        h1 { font-size: 1.8rem; font-weight: 700; }
+        .tag-date { padding: 6px 14px; border-radius: 14px; font-size: 0.8rem; font-weight: 600; background: var(--surf); border: 1px solid var(--border); }
 
-        /* Dashboard Highlights */
+        /* Hero */
         .hero-card {
             background: var(--primary-grad);
             border-radius: var(--round);
             padding: 24px;
             color: white;
             margin-bottom: 30px;
-            box-shadow: 0 15px 30px rgba(0,122,255,0.2);
+            box-shadow: 0 15px 30px rgba(0,122,255,0.15);
             position: relative;
             overflow: hidden;
         }
-        .hero-card::after { content: ''; position: absolute; right: -20px; top: -20px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; }
-        .hero-title { font-size: 0.9rem; opacity: 0.8; margin-bottom: 8px; }
-        .hero-main { font-size: 1.6rem; font-weight: 700; margin-bottom: 15px; }
-        .progress-bar { height: 8px; background: rgba(255,255,255,0.2); border-radius: 10px; overflow: hidden; }
-        .progress-inner { height: 100%; background: #fff; width: 0%; transition: 1s ease-out; }
+        .hero-title { font-size: 0.85rem; opacity: 0.8; margin-bottom: 6px; }
+        .hero-main { font-size: 1.5rem; font-weight: 700; margin-bottom: 12px; }
+        .prog-bg { height: 8px; background: rgba(255,255,255,0.2); border-radius: 10px; overflow: hidden; }
+        .prog-fill { height: 100%; background: #fff; width: 0%; transition: 0.8s; }
 
-        /* Category Filter */
-        .cat-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 15px; margin-bottom: 10px; scrollbar-width: none; }
-        .cat-item { 
-            padding: 10px 20px; background: var(--surf); border: 1px solid var(--border); border-radius: 100px; 
-            font-size: 0.85rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: 0.2s;
+        /* Categories */
+        .cat-bar { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 20px; scrollbar-width: none; }
+        .cat-btn { 
+            padding: 8px 18px; background: var(--surf); border: 1px solid var(--border); border-radius: 100px; 
+            font-size: 0.85rem; font-weight: 600; white-space: nowrap; cursor: pointer; transition: 0.2s;
         }
-        .cat-item.active { background: var(--text); color: var(--surf); border-color: var(--text); }
+        .cat-btn.active { background: var(--text); color: var(--surf); border-color: var(--text); }
 
-        /* Reminder Items - Redesigned */
-        .item-group-title { font-size: 0.75rem; color: var(--text-sec); text-transform: uppercase; letter-spacing: 1px; margin: 20px 0 12px 5px; }
-        .item-card {
+        /* Reminder List */
+        .group-name { font-size: 0.7rem; color: var(--text-sec); text-transform: uppercase; letter-spacing: 1px; margin: 15px 0 10px 4px; }
+        .item {
             background: var(--surf);
             border-radius: var(--round);
-            padding: 18px;
-            margin-bottom: 12px;
+            padding: 16px;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
-            gap: 16px;
-            box-shadow: 0 2px 15px var(--shadow);
-            transition: 0.3s;
-            border: 1px solid transparent;
+            gap: 14px;
+            box-shadow: 0 2px 10px var(--border);
+            transition: 0.2s;
         }
-        .item-card:hover { transform: translateY(-2px); border-color: var(--primary); }
-        .priority-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-        .dot-high { background: var(--p-h); box-shadow: 0 0 10px rgba(255,59,48,0.4); }
-        .dot-mid { background: var(--p-m); box-shadow: 0 0 10px rgba(255,149,0,0.4); }
-        .dot-low { background: var(--p-l); box-shadow: 0 0 10px rgba(52,199,89,0.4); }
+        .item:active { transform: scale(0.98); }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .p-high { background: var(--p-h); box-shadow: 0 0 8px var(--p-h); }
+        .p-mid { background: var(--p-m); box-shadow: 0 0 8px var(--p-m); }
+        .p-low { background: var(--p-l); box-shadow: 0 0 8px var(--p-l); }
         
-        .item-content { flex: 1; }
-        .item-name { font-weight: 600; font-size: 1.05rem; margin-bottom: 2px; }
-        .item-time { font-weight: 500; font-size: 0.85rem; color: var(--primary); }
+        .item-text { flex: 1; }
+        .item-text h4 { font-size: 1rem; font-weight: 600; margin-bottom: 2px; }
+        .item-text p { font-size: 0.8rem; font-weight: 500; color: var(--primary); }
         
-        .btn-action { 
-            width: 36px; height: 36px; border-radius: 50%; background: var(--bg); display: flex; 
-            align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; color: var(--text-sec);
-        }
-        .btn-action:hover { background: var(--primary-grad); color: white; }
-        .completed .item-name { text-decoration: line-through; opacity: 0.5; }
+        .btn-circle { width: 34px; height: 34px; border-radius: 50%; background: var(--bg); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-sec); }
+        .btn-circle:hover { background: var(--primary-light); color: var(--primary); }
 
-        /* Bottom Nav - Floating Style */
-        .nav-dock {
+        /* Dock */
+        .dock {
             position: absolute; bottom: 20px; left: 20px; right: 20px;
-            height: 70px; background: rgba(var(--surf-rgb), 0.8); backdrop-filter: blur(20px);
-            border-radius: 35px; border: 1px solid var(--border);
+            height: 72px; background: rgba(var(--surf), 0.8); backdrop-filter: blur(25px);
+            border-radius: 36px; border: 1px solid var(--border);
             display: flex; justify-content: space-around; align-items: center; z-index: 100;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
-        .tab { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--text-sec); cursor: pointer; transition: 0.3s; }
-        .tab.active { color: var(--primary); }
-        .tab i { font-size: 1.4rem; }
-        .tab span { font-size: 0.7rem; font-weight: 600; }
+        .dock-tab { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--text-sec); cursor: pointer; }
+        .dock-tab.active { color: var(--primary); }
+        .dock-tab i { font-size: 1.3rem; }
+        .dock-tab span { font-size: 0.65rem; font-weight: 700; }
         
-        .btn-add-main {
-            width: 56px; height: 56px; background: var(--primary-grad); border-radius: 50%;
-            display: flex; align-items: center; justify-content: center; transform: translateY(-20px);
-            box-shadow: 0 10px 25px rgba(0,122,255,0.4); color: white; font-size: 1.5rem; transition: 0.3s;
+        .dock-add {
+            width: 54px; height: 54px; background: var(--primary-grad); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; transform: translateY(-18px);
+            box-shadow: 0 10px 20px rgba(0,122,255,0.3); color: white; font-size: 1.4rem;
         }
-        .btn-add-main:hover { transform: translateY(-25px) rotate(90deg); }
 
-        /* Interaction Panel (Action Sheet) */
-        .sheet { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: none; }
-        .sheet-overlay { position: absolute; width:100%; height:100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); }
-        .sheet-body { 
+        /* Action Sheet */
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: none; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); }
+        .sheet { 
             position: absolute; bottom: 0; width: 100%; max-width: 414px; left: 50%; transform: translateX(-50%); 
-            background: var(--surf); border-radius: 32px 32px 0 0; padding: 32px; 
-            animation: sheetUp 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+            background: var(--surf); border-radius: 32px 32px 0 0; padding: 30px; 
+            animation: sheetUp 0.5s cubic-bezier(0.19, 1, 0.22, 1);
         }
         @keyframes sheetUp { from { transform: translate(-50%, 100%); } to { transform: translate(-50%, 0); } }
         
-        .sheet-handle { width: 40px; height: 5px; background: var(--border); border-radius: 10px; margin: 0 auto 25px; }
-        .form-label { font-size: 0.75rem; font-weight: 700; color: var(--text-sec); text-transform: uppercase; margin-bottom: 10px; display: block; }
-        .input-pill { width:100%; background: var(--bg); border:none; border-radius: 16px; padding: 18px; font-size: 1rem; color: var(--text); margin-bottom: 24px; outline: none; font-weight: 500; }
-        .btn-submit { width:100%; padding:20px; background: var(--primary-grad); color:white; border-radius: 18px; border:none; font-weight:700; font-size:1.1rem; cursor:pointer; }
+        /* Forms */
+        .f-label { font-size: 0.7rem; font-weight: 700; color: var(--text-sec); text-transform: uppercase; margin-bottom: 8px; display: block; }
+        .f-input { width:100%; background: var(--bg); border:none; border-radius: 16px; padding: 16px; font-size: 1rem; color: var(--text); margin-bottom: 20px; outline: none; }
+        .f-btn { width:100%; padding:18px; background: var(--primary-grad); color:white; border-radius: 16px; border:none; font-weight:700; font-size:1rem; cursor:pointer; }
 
-        /* Stats & Logs */
-        .log-item { display: flex; align-items: center; gap: 15px; padding: 15px 0; border-bottom: 1px solid var(--border); }
-        .log-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; }
-        .log-info h4 { font-size: 1rem; font-weight: 600; }
-        .log-info p { font-size: 0.8rem; color: var(--text-sec); }
+        /* Logs View */
+        .log-row { display: flex; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+        .log-box { width: 38px; height: 38px; border-radius: 12px; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; }
+        .log-msg h4 { font-size: 0.95rem; font-weight: 600; }
+        .log-msg p { font-size: 0.75rem; color: var(--text-sec); }
 
-        /* Empty State */
-        .empty { text-align: center; padding-top: 60px; color: var(--text-sec); }
-        .empty i { font-size: 4rem; opacity: 0.1; margin-bottom: 20px; display: block; }
+        /* Settings View */
+        .set-card { background: var(--surf); border-radius: 20px; margin-bottom: 12px; overflow: hidden; }
+        .set-row { display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid var(--border); }
+        .set-info h4 { font-size: 0.95rem; font-weight: 600; }
+        .set-info p { font-size: 0.75rem; color: var(--text-sec); }
+        
+        .empty { text-align: center; padding-top: 50px; color: var(--text-sec); opacity: 0.4; }
+        .empty i { font-size: 3rem; margin-bottom: 15px; }
 
     </style>
 </head>
 <body data-theme="dark">
 
 <div class="app-shell">
-    <!-- Main Screens -->
     <div class="screen">
         
-        <!-- Tab 1: Dashboard -->
-        <div id="viewFocus" class="view active">
+        <!-- Tab: Main -->
+        <div id="viewMain" class="view active">
             <header class="h-row">
-                <h1 id="greeting">Hello, Gaga</h1>
-                <div class="badge" id="dateStr">Apr 10</div>
+                <h1 id="txtGreeting">您好，Gaga</h1>
+                <div class="tag-date" id="txtDate">4月10日</div>
             </header>
 
             <div class="hero-card">
-                <div class="hero-title">Next Task</div>
-                <div class="hero-main" id="nextTask">Review Market Data</div>
-                <div class="progress-bar"><div class="progress-inner" id="todayProg"></div></div>
-                <div style="font-size: 0.75rem; margin-top: 10px; opacity: 0.8;" id="progText">4 of 5 completed</div>
+                <div class="hero-title" id="txtNextLabel">下一项任务</div>
+                <div class="hero-main" id="txtNextTitle">正在加载...</div>
+                <div class="prog-bg"><div class="prog-fill" id="progLine"></div></div>
+                <div style="font-size: 0.7rem; margin-top: 8px; opacity: 0.9;" id="txtProgStatus">今日已完成 0 项</div>
             </div>
 
-            <div class="cat-scroll">
-                <div class="cat-item active" data-cat="all">All Items</div>
-                <div class="cat-item" data-cat="work">Work</div>
-                <div class="cat-item" data-cat="life">Life</div>
-                <div class="cat-item" data-cat="health">Health</div>
-                <div class="cat-item" data-cat="finance">Bills</div>
+            <div class="cat-bar" id="catFilter">
+                <div class="cat-btn active" data-cat="all">全部</div>
+                <div class="cat-btn" data-cat="work">工作</div>
+                <div class="cat-btn" data-cat="life">生活</div>
+                <div class="cat-btn" data-cat="health">健康</div>
             </div>
 
-            <div id="remindersContainer">
-                <!-- Grouped Items -->
-            </div>
+            <div id="listReminders"></div>
         </div>
 
-        <!-- Tab 2: Analytics -->
+        <!-- Tab: History & Stats -->
         <div id="viewStats" class="view">
-            <h1 style="margin-bottom:20px">Analytics</h1>
-            <div style="background:var(--surf); padding:20px; border-radius:var(--round); margin-bottom:25px;">
-                <canvas id="mainChart" height="200"></canvas>
+            <h1 style="margin-bottom:20px" id="txtInsights">执行数据</h1>
+            <div style="background:var(--surf); padding:15px; border-radius:var(--round); margin-bottom:20px;">
+                <canvas id="chartExec" height="180"></canvas>
             </div>
-            <div id="logsContainer">
-                <!-- Timeline -->
-            </div>
+            <div id="listLogs"></div>
         </div>
 
-        <!-- Tab 3: Settings -->
-        <div id="viewConfig" class="view">
-            <h1 style="margin-bottom:20px">Settings</h1>
-            <div class="item-card" onclick="toggleTheme()">
-                <div class="log-icon"><i class="fas fa-moon"></i></div>
-                <div class="item-content"><div class="item-name">Dark Mode</div><div class="item-time">Current: On</div></div>
-                <i class="fas fa-chevron-right text-sec"></i>
+        <!-- Tab: System Logs -->
+        <div id="viewLogs" class="view">
+            <h1 style="margin-bottom:20px" id="txtSysLogs">系统日志</h1>
+            <div id="listSysLogs"></div>
+        </div>
+
+        <!-- Tab: Settings -->
+        <div id="viewSettings" class="view">
+            <h1 style="margin-bottom:20px" id="txtSettings">系统设置</h1>
+            
+            <div class="set-card">
+                <div class="set-row" onclick="toggleDark()">
+                    <div class="set-info"><h4>深色模式</h4><p>当前：<span id="txtThemeStatus">开启</span></p></div>
+                    <i class="fas fa-moon color-primary"></i>
+                </div>
+                <div class="set-row">
+                    <div class="set-info"><h4>系统语言</h4><p>当前：中文</p></div>
+                    <i class="fas fa-language color-primary"></i>
+                </div>
             </div>
-            <!-- More settings... -->
+
+            <div class="set-card">
+                <div class="set-row" onclick="openWebhookSheet()">
+                    <div class="set-info"><h4>Webhook 推送</h4><p>配置企业微信/钉钉/飞书</p></div>
+                    <i class="fas fa-link color-primary"></i>
+                </div>
+            </div>
+
+            <div style="text-align:center; margin-top:30px;">
+                <p style="font-size:0.7rem; color:var(--text-sec);">Life Reminder v2.0.0</p>
+                <p style="font-size:0.6rem; color:var(--text-sec); margin-top:4px;">Made by mygaga2024</p>
+            </div>
         </div>
 
     </div>
 
-    <!-- Floating Navigation Dock -->
-    <div class="nav-dock">
-        <div class="tab active" onclick="showView('Focus', this)">
-            <i class="fas fa-compass"></i>
-            <span>Focus</span>
+    <!-- Unified Dock -->
+    <div class="dock">
+        <div class="dock-tab active" onclick="nav('Main', this)">
+            <i class="fas fa-house"></i><span id="txtTabMain">首页</span>
         </div>
-        <div class="btn-add-main" onclick="openSheet()">
-            <i class="fas fa-plus"></i>
+        <div class="dock-tab" onclick="nav('Stats', this)">
+            <i class="fas fa-chart-simple"></i><span id="txtTabStats">记录</span>
         </div>
-        <div class="tab" onclick="showView('Stats', this)">
-            <i class="fas fa-chart-pie"></i>
-            <span>Insights</span>
+        <div class="dock-add" onclick="openAddSheet()"><i class="fas fa-plus"></i></div>
+        <div class="dock-tab" onclick="nav('Logs', this)">
+            <i class="fas fa-terminal"></i><span id="txtTabLogs">日志</span>
+        </div>
+        <div class="dock-tab" onclick="nav('Settings', this)">
+            <i class="fas fa-gear"></i><span id="txtTabSet">设置</span>
         </div>
     </div>
 </div>
 
-<!-- Add Sheet -->
-<div class="sheet" id="addSheet">
-    <div class="sheet-overlay" onclick="closeSheet()"></div>
-    <div class="sheet-body">
-        <div class="sheet-handle"></div>
-        <h2 style="margin-bottom:30px">New Task</h2>
-        
-        <label class="form-label">What's on your mind?</label>
-        <input type="text" id="f_title" class="input-pill" placeholder="e.g. Gym Session">
-        
-        <div style="display:flex; gap:15px; margin-bottom:24px;">
+<!-- Sheets -->
+<div class="overlay" id="sheetOverlay" onclick="closeSheet()">
+    <!-- Add Sheet -->
+    <div class="sheet" id="addSheet" onclick="event.stopPropagation()">
+        <h2 style="margin-bottom:24px" id="txtNewTask">新建任务</h2>
+        <label class="f-label">任务内容</label>
+        <input type="text" id="f_title" class="f_input" placeholder="输入任务名称...">
+        <div style="display:flex; gap:12px">
             <div style="flex:1">
-                <label class="form-label">Trigger Time</label>
-                <input type="time" id="f_time" class="input-pill" style="margin-bottom:0">
+                <label class="f-label">执行时间</label>
+                <input type="time" id="f_time" class="f_input" value="09:00">
             </div>
             <div style="flex:1">
-                <label class="form-label">Priority</label>
-                <select id="f_priority" class="input-pill" style="margin-bottom:0">
-                    <option value="low">Low</option>
-                    <option value="mid">Medium</option>
-                    <option value="high">Urgent</option>
+                <label class="f-label">优先级</label>
+                <select id="f_priority" class="f_input">
+                    <option value="low">低</option>
+                    <option value="mid">中</option>
+                    <option value="high">紧急</option>
                 </select>
             </div>
         </div>
-
-        <label class="form-label">Category</label>
-        <div class="cat-scroll" id="f_cat_picker">
-            <div class="cat-item active" data-val="work">Work</div>
-            <div class="cat-item" data-val="life">Life</div>
-            <div class="cat-item" data-val="health">Health</div>
-            <div class="cat-item" data-val="finance">Bills</div>
+        <label class="f-label">任务分类</label>
+        <div class="cat-bar" id="f_cat_picker" style="margin-bottom:20px">
+            <div class="cat-btn active" data-val="work">工作</div>
+            <div class="cat-btn" data-val="life">生活</div>
+            <div class="cat-btn" data-val="health">健康</div>
         </div>
+        <button class="f-btn" onclick="saveTask()">完成并创建</button>
+    </div>
 
-        <button class="btn-submit" onclick="submitReminder()">Add Task</button>
+    <!-- Webhook Sheet -->
+    <div class="sheet" id="webhookSheet" onclick="event.stopPropagation()">
+        <h2 style="margin-bottom:24px">Webhook 配置</h2>
+        <label class="f-label">企业微信 Webhook</label>
+        <input type="text" id="w_wecom" class="f_input" placeholder="https://...">
+        <label class="f-label">钉钉 Webhook</label>
+        <input type="text" id="w_ding" class="f_input" placeholder="https://...">
+        <button class="f-btn" onclick="saveSettings()">保存配置</button>
     </div>
 </div>
 
 <script>
-    let state = { db: { reminders: [], settings: {} }, logs: [] };
-    let chart = null;
+    let data = { db: { reminders: [], settings: {} }, logs: [], syslogs: [] };
+    let execChart = null;
 
     async function sync() {
         const res = await fetch('/api/state');
-        state = await res.json();
+        data = await res.json();
         
-        // Update UI
-        renderReminders();
+        renderMain();
         renderStats();
-        updateSummary();
+        renderSysLogs();
         
-        // Handlers for dynamic UI
-        document.getElementById('dateStr').textContent = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        const hr = new Date().getHours();
-        document.getElementById('greeting').textContent = hr < 12 ? 'Good Morning' : hr < 18 ? 'Good Afternoon' : 'Good Evening';
+        // Settings init
+        document.getElementById('w_wecom').value = data.db.settings.webhooks.wecom || '';
+        document.getElementById('w_ding').value = data.db.settings.webhooks.dingtalk || '';
+        document.body.setAttribute('data-theme', data.db.settings.dark_mode ? 'dark' : 'light');
+        document.getElementById('txtThemeStatus').innerText = data.db.settings.dark_mode ? '开启' : '关闭';
+
+        // Greet & Date
+        const h = new Date().getHours();
+        document.getElementById('txtGreeting').innerText = h < 9 ? '早上好，Gaga' : h < 12 ? '上午好，Gaga' : h < 18 ? '下午好，Gaga' : '晚上好，Gaga';
+        document.getElementById('txtDate').innerText = new Date().toLocaleDateString('zh-CN', {month: 'short', day: 'numeric'});
     }
 
-    function renderReminders() {
-        const container = document.getElementById('remindersContainer');
-        const items = state.db.reminders;
+    function renderMain() {
+        const list = document.getElementById('listReminders');
+        const items = data.db.reminders;
+        const activeFilter = document.querySelector('#catFilter .active').dataset.cat;
         
-        if (items.length === 0) {
-            container.innerHTML = `<div class="empty"><i class="fas fa-peace"></i>Everything is clear today</div>`;
+        // Summary Card
+        const pending = items.filter(r => r.status === 'pending').sort((a,b) => a.time.localeCompare(b.time));
+        const doneCount = items.filter(r => r.status === 'completed').length;
+        const total = items.length;
+        
+        document.getElementById('txtProgStatus').innerText = `今日已完成 ${doneCount} / ${total} 项`;
+        document.getElementById('progLine').style.width = total > 0 ? (doneCount/total * 100) + '%' : '0%';
+        document.getElementById('txtNextTitle').innerText = pending.length > 0 ? pending[0].title : '今日目标已达成！';
+
+        const filtered = items.filter(r => activeFilter === 'all' || r.category === activeFilter);
+        if (filtered.length === 0) {
+            list.innerHTML = `<div class="empty"><i class="fas fa-dove"></i><p>当前分类下无任务</p></div>`;
             return;
         }
 
-        // Group by priority for focus
-        const groups = { high: [], mid: [], low: [] };
-        items.filter(r => r.status === 'pending').forEach(r => groups[r.priority || 'low'].push(r));
+        const groups = { high: [], mid: [], low: [], completed: [] };
+        filtered.forEach(r => { if(r.status==='completed') groups.completed.push(r); else groups[r.priority].push(r); });
 
         let html = '';
-        ['high', 'mid', 'low'].forEach(p => {
-            if (groups[p].length > 0) {
-                html += `<div class="item-group-title">${p} priority</div>`;
-                groups[p].forEach(r => {
+        ['high', 'mid', 'low', 'completed'].forEach(g => {
+            if (groups[g].length > 0) {
+                html += `<div class="group-name">${g === 'completed' ? '已完成' : g.toUpperCase() + ' 优先级'}</div>`;
+                groups[g].forEach(r => {
                     html += `
-                        <div class="item-card">
-                            <div class="priority-dot dot-${r.priority}"></div>
-                            <div class="item-content">
-                                <div class="item-name">${r.title}</div>
-                                <div class="item-time"><i class="far fa-clock"></i> ${r.time}</div>
-                            </div>
-                            <div class="btn-action" onclick="markDone('${r.id}')"><i class="fas fa-check"></i></div>
-                            <div class="btn-action" onclick="deleteTask('${r.id}')"><i class="fas fa-trash-alt"></i></div>
+                    <div class="item ${r.status==='completed' ? 'done' : ''}" style="${r.status==='completed' ? 'opacity:0.5' : ''}">
+                        <div class="dot p-${r.priority}"></div>
+                        <div class="item-text">
+                            <h4>${r.title}</h4>
+                            <p>${r.time}</p>
                         </div>
-                    `;
+                        <div class="btn-circle" onclick="taskAction('${r.id}', 'toggle')"><i class="fas fa-check"></i></div>
+                        <div class="btn-circle" onclick="taskAction('${r.id}', 'delete')"><i class="fas fa-trash-can"></i></div>
+                    </div>`;
                 });
             }
         });
-        container.innerHTML = html;
+        list.innerHTML = html;
     }
 
     function renderStats() {
-        const logC = document.getElementById('logsContainer');
-        logC.innerHTML = state.logs.slice().reverse().map(l => `
-            <div class="log-item">
-                <div class="log-icon"><i class="fas fa-check"></i></div>
-                <div class="log-info">
+        const hist = document.getElementById('listLogs');
+        hist.innerHTML = data.logs.slice().reverse().map(l => `
+            <div class="log-row">
+                <div class="log-box"><i class="fas fa-bell"></i></div>
+                <div class="log-msg">
                     <h4>${l.title}</h4>
-                    <p>${new Date(l.triggered_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} • ${l.status}</p>
+                    <p>${new Date(l.triggered_at).toLocaleTimeString()} • ${l.completed_at ? '已处理' : '已通知'}</p>
                 </div>
             </div>
         `).join('');
 
-        if (state.logs.length > 0) updateChart();
+        const ctx = document.getElementById('chartExec').getContext('2d');
+        if (execChart) execChart.destroy();
+        execChart = new Chart(ctx, {
+            type: 'line', data: { labels: ['M','T','W','T','F','S','S'], datasets: [{ data: [3, 5, 2, 8, 4, 10, 6], borderColor:'#007AFF', tension:0.4, fill:true, backgroundColor:'rgba(0,122,255,0.1)', pointRadius:0 }] },
+            options: { plugins: { legend: { display:false } }, scales: { x: { grid: { display:false } }, y: { display:false } } }
+        });
     }
 
-    function updateSummary() {
-        const pending = state.db.reminders.filter(r => r.status === 'pending');
-        const completed = state.db.reminders.filter(r => r.status === 'completed');
-        const total = pending.length + completed.length;
-        
-        const prog = total > 0 ? (completed.length / total) * 100 : 0;
-        document.getElementById('todayProg').style.width = prog + '%';
-        document.getElementById('progText').textContent = `${completed.length} of ${total} tasks completed`;
-        
-        if (pending.length > 0) {
-            // Find earliest next task
-            const next = pending.sort((a,b) => a.time.localeCompare(b.time))[0];
-            document.getElementById('nextTask').textContent = next.title;
-        } else {
-            document.getElementById('nextTask').textContent = 'Well Done!';
-        }
+    function renderSysLogs() {
+        document.getElementById('listSysLogs').innerHTML = data.syslogs.map(log => `
+            <div style="font-family:monospace; font-size:0.7rem; padding:8px 0; border-bottom:1px solid var(--border); color:var(--text-sec);">
+                ${log}
+            </div>
+        `).join('');
     }
 
-    async function submitReminder() {
+    async function taskAction(id, type) {
+        if (type === 'delete' && !confirm('确认删除？')) return;
+        const res = await fetch(`/api/reminders/${id}`, {
+            method: type === 'delete' ? 'DELETE' : 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: type === 'toggle' ? JSON.stringify({ status: 'completed' }) : null
+        });
+        if (res.ok) sync();
+    }
+
+    async function saveTask() {
         const task = {
             title: document.getElementById('f_title').value,
             time: document.getElementById('f_time').value,
@@ -368,80 +406,43 @@
             category: document.querySelector('#f_cat_picker .active').dataset.val,
             repeat: 'daily'
         };
-        if (!task.title || !task.time) return alert('Details needed!');
-        
-        await fetch('/api/reminders', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(task)
-        });
-        closeSheet();
+        if (!task.title) return alert('请输入任务标题');
+        await fetch('/api/reminders', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(task) });
+        closeSheet(); sync();
+    }
+
+    async function saveSettings() {
+        const webhooks = { wecom: document.getElementById('w_wecom').value, dingtalk: document.getElementById('w_ding').value };
+        await fetch('/api/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ webhooks }) });
+        closeSheet(); sync();
+    }
+
+    function toggleDark() {
+        data.db.settings.dark_mode = !data.db.settings.dark_mode;
+        fetch('/api/settings', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ dark_mode: data.db.settings.dark_mode }) });
         sync();
     }
 
-    async function markDone(id) {
-        await fetch(`/api/reminders/${id}`, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ status: 'completed' })
-        });
-        sync();
-    }
-
-    async function deleteTask(id) {
-        if (!confirm('Discard this task?')) return;
-        await fetch(`/api/reminders/${id}`, { method: 'DELETE' });
-        sync();
-    }
-
-    function updateChart() {
-        const ctx = document.getElementById('mainChart').getContext('2d');
-        if (chart) chart.destroy();
-        chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-                datasets: [{
-                    data: [12, 19, 13, 15, 22, 13, 15],
-                    borderColor: '#007AFF',
-                    tension: 0.4,
-                    fill: true,
-                    backgroundColor: 'rgba(0,122,255,0.1)'
-                }]
-            },
-            options: {
-                plugins: { legend: { display: false } },
-                scales: { x: { grid: { display: false } }, y: { display: false } }
-            }
-        });
-    }
-
-    function showView(name, el) {
+    function nav(id, el) {
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.getElementById('view' + name).classList.add('active');
+        document.querySelectorAll('.dock-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('view' + id).classList.add('active');
         el.classList.add('active');
     }
 
-    function openSheet() { document.getElementById('addSheet').style.display = 'block'; }
-    function closeSheet() { document.getElementById('addSheet').style.display = 'none'; }
-    
-    function toggleTheme() {
-        const t = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        document.body.setAttribute('data-theme', t);
-    }
+    function openAddSheet() { document.getElementById('sheetOverlay').style.display = 'block'; document.getElementById('addSheet').style.display = 'block'; document.getElementById('webhookSheet').style.display = 'none'; }
+    function openWebhookSheet() { document.getElementById('sheetOverlay').style.display = 'block'; document.getElementById('webhookSheet').style.display = 'block'; document.getElementById('addSheet').style.display = 'none'; }
+    function closeSheet() { document.getElementById('sheetOverlay').style.display = 'none'; }
 
-    // Init Logic
-    sync();
-    setInterval(sync, 10000);
-
-    // Dynamic Category Selection
-    document.querySelectorAll('#f_cat_picker .cat-item').forEach(i => {
-        i.onclick = () => {
-            i.parentElement.querySelectorAll('.cat-item').forEach(x => x.classList.remove('active'));
-            i.classList.add('active');
-        };
+    document.querySelectorAll('.cat-btn').forEach(b => b.onclick = () => {
+        b.parentElement.querySelectorAll('.cat-btn').forEach(x => x.classList.remove('active')); b.classList.add('active'); renderMain();
     });
+
+    document.querySelectorAll('#f_cat_picker .cat-btn').forEach(b => b.onclick = () => {
+        b.parentElement.querySelectorAll('.cat-btn').forEach(x => x.classList.remove('active')); b.classList.add('active');
+    });
+
+    sync(); setInterval(sync, 15000);
 </script>
 
 </body>
