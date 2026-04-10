@@ -21,23 +21,50 @@
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'Inter', system-ui; background: var(--bg); color: var(--text); transition: background 0.3s; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        body { 
+            font-family: 'Inter', system-ui; 
+            background: #000; /* 纯黑背景，突出中间 */
+            color: var(--text); 
+            transition: background 0.3s; 
+            height: 100vh; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            overflow: hidden; 
+        }
+
+        /* Phone Mockup Container */
+        .app-wrapper {
+            width: 100vw;
+            max-width: 414px; /* iPhone Max Width */
+            height: 92vh;
+            max-height: 850px;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+            border-radius: 40px;
+            border: 8px solid #333; /* 模拟手机边框 */
+            overflow: hidden;
+            transition: 0.3s;
+        }
+
+        .main-container { flex: 1; overflow-y: auto; padding: 20px; position: relative; }
+        .view { display: none; }
+        .view.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Navigation */
         .bottom-nav {
-            height: 85px; background: var(--surf); border-top: 1px solid var(--border);
+            height: 80px; background: var(--surf); border-top: 1px solid var(--border);
             display: flex; justify-content: space-around; padding-top: 10px; z-index: 100;
         }
         .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-sec); cursor: pointer; flex: 1; transition: 0.2s; }
         .nav-item.active { color: var(--primary); }
         .nav-item i { font-size: 1.4rem; }
         .nav-item span { font-size: 0.7rem; font-weight: 500; }
-
-        /* Container & Views */
-        .main-container { flex: 1; overflow-y: auto; padding: 20px; position: relative; }
-        .view { display: none; }
-        .view.active { display: block; animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Header */
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
@@ -67,8 +94,8 @@
         /* Modal / Form */
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; display: none; }
         .modal-bg { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); }
-        .modal-content { position: absolute; bottom: 0; width: 100%; background: var(--surf); border-radius: 30px 30px 0 0; padding: 30px; animation: slideUp 0.4s cubic-bezier(0.19, 1, 0.22, 1); }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal-content { position: absolute; bottom: 0; width: 100%; max-width: 414px; left: 50%; transform: translateX(-50%); background: var(--surf); border-radius: 30px 30px 0 0; padding: 30px; animation: slideUp 0.4s cubic-bezier(0.19, 1, 0.22, 1); }
+        @keyframes slideUp { from { transform: translate(-50%, 100%); } to { transform: translate(-50%, 0); } }
 
         .form-group { margin-bottom: 20px; }
         .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-sec); margin-bottom: 8px; text-transform: uppercase; }
@@ -90,12 +117,6 @@
         .tp-wheel { font-size: 2rem; display: flex; justify-content: center; gap: 15px; margin: 20px 0; font-weight: 700; color: var(--primary); }
         .tp-wheel input { width: 70px; text-align: center; border: none; background: var(--primary-light); border-radius: 12px; padding: 10px; font-size: 2rem; font-weight: 700; color: var(--primary); outline: none; }
 
-        /* NLP Area */
-        .nlp-hint { font-size: 0.75rem; color: var(--primary); margin-top: 8px; font-style: italic; cursor: pointer; }
-
-        /* Swipe Actions Hint */
-        .swipe-hint { position: absolute; right: -80px; top: 0; bottom: 0; width: 80px; background: var(--p-l); color: white; display: flex; align-items: center; justify-content: center; border-radius: 0 20px 20px 0; }
-
         /* Settings view specific */
         .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--border); }
         .setting-info h4 { font-size: 1rem; margin-bottom: 2px; }
@@ -105,97 +126,98 @@
 </head>
 <body data-theme="dark">
 
-<div class="main-container">
-    
-    <!-- View 1: Reminders -->
-    <div id="viewList" class="view active">
-        <header>
-            <h1 data-i18n="reminders">Reminders</h1>
-            <div class="add-circle" onclick="openModal('addRem')"><i class="fas fa-plus"></i></div>
-        </header>
-        <div id="reminderList">
-            <!-- Dynamic List -->
+<div class="app-wrapper">
+    <div class="main-container">
+        
+        <!-- View 1: Reminders -->
+        <div id="viewList" class="view active">
+            <header>
+                <h1 data-i18n="reminders">Reminders</h1>
+                <div class="add-circle" onclick="openModal('addRem')"><i class="fas fa-plus"></i></div>
+            </header>
+            <div id="reminderList">
+                <!-- Dynamic List -->
+            </div>
+        </div>
+
+        <!-- View 2: Journal -->
+        <div id="viewLogs" class="view">
+            <header><h1 data-i18n="journal">Journal</h1></header>
+            <div class="journal-stat">
+                <div>
+                    <p data-i18n="completion_rate" style="font-size:0.9rem; opacity:0.8;">Completion Rate</p>
+                    <h2 id="weeklyRate">95%</h2>
+                </div>
+                <i class="fas fa-chart-line fa-2x"></i>
+            </div>
+            <div class="chart-container">
+                <canvas id="weeklyChart"></canvas>
+            </div>
+            <div class="timeline" id="logList">
+                <!-- Dynamic Logs -->
+            </div>
+        </div>
+
+        <!-- View 3: Settings -->
+        <div id="viewSettings" class="view">
+            <header><h1 data-i18n="settings">Settings</h1></header>
+            <div class="setting-item">
+                <div class="setting-info">
+                    <h4 data-i18n="language">Language</h4>
+                    <p id="curLang">English</p>
+                </div>
+                <select id="langSelect" onchange="changeLang(this.value)" style="background:transparent; border:none; color:var(--primary); font-weight:600; outline:none;">
+                    <option value="zh">简体中文</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+            <div class="setting-item">
+                <div class="setting-info">
+                    <h4 data-i18n="dark_mode">Dark Mode</h4>
+                    <p data-i18n="dark_mode_desc">Easy on the eyes</p>
+                </div>
+                <input type="checkbox" id="darkModeToggle" checked onchange="toggleDarkMode()">
+            </div>
+            <div class="setting-item" onclick="openModal('webhooksModal')">
+                <div class="setting-info">
+                    <h4 data-i18n="webhooks">Webhooks</h4>
+                    <p data-i18n="webhooks_desc">Configure bots</p>
+                </div>
+                <i class="fas fa-chevron-right text-sec"></i>
+            </div>
+            <div class="setting-item">
+                <div class="setting-info">
+                    <h4>About</h4>
+                    <p>Life Reminder v1.2.0 • Pro Edition</p>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- View 2: Journal -->
-    <div id="viewLogs" class="view">
-        <header><h1 data-i18n="journal">Journal</h1></header>
-        <div class="journal-stat">
-            <div>
-                <p data-i18n="completion_rate" style="font-size:0.9rem; opacity:0.8;">Completion Rate</p>
-                <h2 id="weeklyRate">95%</h2>
-            </div>
-            <i class="fas fa-chart-line fa-2x"></i>
+    <!-- Bottom Navigation -->
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="switchTab('List', this)">
+            <i class="fas fa-list-ul"></i>
+            <span data-i18n="reminders">Reminders</span>
         </div>
-        <div class="chart-container">
-            <canvas id="weeklyChart"></canvas>
+        <div class="nav-item" onclick="switchTab('Logs', this)">
+            <i class="fas fa-calendar-check"></i>
+            <span data-i18n="journal">Journal</span>
         </div>
-        <div class="timeline" id="logList">
-            <!-- Dynamic Logs -->
-        </div>
-    </div>
-
-    <!-- View 3: Settings -->
-    <div id="viewSettings" class="view">
-        <header><h1 data-i18n="settings">Settings</h1></header>
-        <div class="setting-item">
-            <div class="setting-info">
-                <h4 data-i18n="language">Language</h4>
-                <p id="curLang">English</p>
-            </div>
-            <select id="langSelect" onchange="changeLang(this.value)" style="background:transparent; border:none; color:var(--primary); font-weight:600; outline:none;">
-                <option value="zh">简体中文</option>
-                <option value="en">English</option>
-            </select>
-        </div>
-        <div class="setting-item">
-            <div class="setting-info">
-                <h4 data-i18n="dark_mode">Dark Mode</h4>
-                <p data-i18n="dark_mode_desc">Easy on the eyes</p>
-            </div>
-            <input type="checkbox" id="darkModeToggle" checked onchange="toggleDarkMode()">
-        </div>
-        <div class="setting-item" onclick="openModal('webhooksModal')">
-            <div class="setting-info">
-                <h4 data-i18n="webhooks">Webhooks</h4>
-                <p data-i18n="webhooks_desc">Configure notifications</p>
-            </div>
-            <i class="fas fa-chevron-right text-sec"></i>
-        </div>
-        <div class="setting-item">
-            <div class="setting-info">
-                <h4 data-i18n="about">About</h4>
-                <p>Life Reminder v1.2.0 • Pro Edition</p>
-            </div>
+        <div class="nav-item" onclick="switchTab('Settings', this)">
+            <i class="fas fa-sliders-h"></i>
+            <span data-i18n="settings">Settings</span>
         </div>
     </div>
 </div>
 
-<!-- Bottom Navigation -->
-<div class="bottom-nav">
-    <div class="nav-item active" onclick="switchTab('List', this)">
-        <i class="fas fa-list-ul"></i>
-        <span data-i18n="reminders">Reminders</span>
-    </div>
-    <div class="nav-item" onclick="switchTab('Logs', this)">
-        <i class="fas fa-calendar-check"></i>
-        <span data-i18n="journal">Journal</span>
-    </div>
-    <div class="nav-item" onclick="switchTab('Settings', this)">
-        <i class="fas fa-sliders-h"></i>
-        <span data-i18n="settings">Settings</span>
-    </div>
-</div>
-
-<!-- Modal: Add Reminder -->
+<!-- Modals -->
 <div class="modal" id="addRem">
     <div class="modal-bg" onclick="closeModal()"></div>
     <div class="modal-content">
         <div class="form-group">
             <label data-i18n="title">Title</label>
             <input type="text" id="f_title" class="f_input" placeholder="Call Mom...">
-            <p class="nlp-hint" onclick="applyNLP('Call Mom at 8pm')">Try: "Call Mom at 8pm"</p>
         </div>
         <div class="form-group">
             <label data-i18n="time">Time</label>
@@ -228,11 +250,10 @@
     </div>
 </div>
 
-<!-- Modal: Webhooks -->
 <div class="modal" id="webhooksModal">
     <div class="modal-bg" onclick="closeModal()"></div>
     <div class="modal-content">
-        <h3 data-i18n="webhook_config" style="margin-bottom:20px">Webhook Configuration</h3>
+        <h3 style="margin-bottom:20px">Webhook Configuration</h3>
         <div class="form-group">
             <label>Enterprise WeChat</label>
             <input type="text" id="w_wecom" class="f_input" placeholder="Webhook URL...">
@@ -254,18 +275,14 @@
             title: "标题", time: "时间", priority: "优先级", notify_channels: "推送渠道",
             cancel: "取消", save: "保存", confirm: "确认", 
             completion_rate: "本周完成率", language: "语言", dark_mode: "黑暗模式",
-            dark_mode_desc: "保护您的视力", webhooks: "消息接口", webhooks_desc: "配置 Webhook 机器人",
-            about: "关于", webhook_config: "推送配置",
-            low: "低", mid: "中", high: "高"
+            dark_mode_desc: "保护您的视力", low: "低", mid: "中", high: "高"
         },
         en: {
             reminders: "Reminders", journal: "Journal", settings: "Settings",
             title: "Title", time: "Time", priority: "Priority", notify_channels: "Channels",
             cancel: "Cancel", save: "Save", confirm: "Confirm",
             completion_rate: "Weekly Rate", language: "Language", dark_mode: "Dark Mode",
-            dark_mode_desc: "Easy on the eyes", webhooks: "Webhooks", webhooks_desc: "Configure bots",
-            about: "About", webhook_config: "Webhooks",
-            low: "Low", mid: "Mid", high: "High"
+            dark_mode_desc: "Easy on the eyes", low: "Low", mid: "Mid", high: "High"
         }
     };
 
@@ -291,10 +308,6 @@
     function renderReminders() {
         const list = document.getElementById('reminderList');
         const items = appData.config.reminders;
-        if (!items.length) {
-            list.innerHTML = '<p class="text-sec" style="text-align:center; margin-top:50px;">Nothing scheduled yet.</p>';
-            return;
-        }
         list.innerHTML = items.map(r => `
             <div class="card p-${r.priority || 'low'} ${r.status === 'completed' ? 'completed' : ''}">
                 <div class="card-header">
@@ -305,7 +318,6 @@
                     <div class="channel-icons">
                         <i class="fas fa-bell"></i>
                         ${r.channels && r.channels.includes('wechat') ? '<i class="fab fa-weixin"></i>' : ''}
-                        ${r.channels && r.channels.includes('email') ? '<i class="fas fa-envelope"></i>' : ''}
                     </div>
                     <div class="btn-check" onclick="toggleComplete('${r.id}')">
                         <i class="fas fa-check"></i>
@@ -331,21 +343,12 @@
     async function toggleComplete(rid) {
         const r = appData.config.reminders.find(x => x.id === rid);
         const newStatus = r.status === 'completed' ? 'pending' : 'completed';
-        const res = await fetch(`/api/reminders/${rid}`, {
+        await fetch(`/api/reminders/${rid}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ status: newStatus, mood: '😊', log_notes: 'Done!' })
+            body: JSON.stringify({ status: newStatus })
         });
-        if (res.ok) fetchData();
-    }
-
-    function applyNLP(text) {
-        document.getElementById('f_title').value = text;
-        // Simple NLP mock: if includes 'at 8pm', set HH to 20
-        if (text.includes('8pm')) {
-            document.getElementById('f_h').value = '20';
-            document.getElementById('f_m').value = '00';
-        }
+        fetchData();
     }
 
     async function saveReminder() {
@@ -362,25 +365,19 @@
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ title, time: `${h}:${m}`, priority, channels, repeat: 'daily' })
         });
-        if (res.ok) {
-            closeModal();
-            fetchData();
-        }
+        if (res.ok) { closeModal(); fetchData(); }
     }
 
     function updateChart() {
         const ctx = document.getElementById('weeklyChart').getContext('2d');
         if (chartInstance) chartInstance.destroy();
-        
-        // Mock data based on logs
-        const data = [12, 19, 3, 5, 2, 3, 9];
         chartInstance = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
                 datasets: [{
                     label: 'Tasks Completed',
-                    data: data,
+                    data: [12, 19, 3, 5, 2, 3, 9],
                     backgroundColor: '#007AFF',
                     borderRadius: 10,
                 }]
@@ -391,9 +388,6 @@
                 scales: { y: { display: false }, x: { grid: { display: false } } }
             }
         });
-        
-        // Update score
-        document.getElementById('weeklyRate').textContent = Math.round((data.reduce((a,b)=>a+b,0) / 70) * 100) + '%';
     }
 
     function openModal(id) { document.getElementById(id).style.display = 'block'; }
@@ -412,7 +406,6 @@
         document.getElementById('curLang').innerText = l === 'zh' ? '简体中文' : 'English';
     }
 
-    // Toggle Box Logic
     document.querySelectorAll('.toggle-box').forEach(box => {
         box.onclick = () => {
             if (box.parentElement.id === 'f_priority') {
@@ -424,9 +417,8 @@
         };
     });
 
-    // Handle initial state
     fetchData();
-    changeLang('en'); // Default to English based on pro requirement
+    changeLang('zh');
 </script>
 
 </body>
