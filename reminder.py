@@ -18,11 +18,16 @@ class ListHandler(logging.Handler):
         super().__init__()
         self.logs = []
     def emit(self, record):
-        self.logs.append(self.format(record))
-        if len(self.logs) > 50: self.logs.pop(0)
+        try:
+            msg = self.format(record)
+            self.logs.append(msg)
+            if len(self.logs) > 50: self.logs.pop(0)
+        except Exception:
+            self.handleError(record)
 
+# 修复关键点：%(message)s 才是正确的占位符
 log_handler = ListHandler()
-log_handler.setFormatter(logging.Formatter('%H:%M:%S - %message'))
+log_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logger = logging.getLogger()
 logger.addHandler(log_handler)
 logger.setLevel(logging.INFO)
@@ -50,7 +55,7 @@ def save_json(filepath, data):
     try:
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-    except Exception as e: logger.error(f"Save error: {e}")
+    except Exception as e: logger.error(f"保存配置失败: {e}")
 
 db = load_json(CONFIG_FILE, {
     "reminders": [],
@@ -68,11 +73,10 @@ def notify_engine(reminder):
     now_str = datetime.datetime.now().strftime('%H:%M:%S')
     msg = f"⏰ 提醒: {title}\n触发时间: {now_str}"
     
-    # Simple Webhook Dispatcher
     for platform, url in s["webhooks"].items():
         if url:
             try: requests.post(url, json={"msgtype": "text", "text": {"content": msg}}, timeout=5)
-            except: pass
+            except Exception as e: logger.error(f"推送失败 ({platform}): {e}")
 
     log_entry = {
         "id": str(uuid.uuid4()), "reminder_id": reminder["id"], "title": title,
@@ -80,7 +84,7 @@ def notify_engine(reminder):
     }
     logs.append(log_entry)
     save_json(LOGS_FILE, logs)
-    logger.info(f"Notification triggered: {title}")
+    logger.info(f"提醒已触发: {title}")
 
 def update_scheduler():
     scheduler.remove_all_jobs()
@@ -96,7 +100,7 @@ def update_scheduler():
                 elif rep.startswith("weekly:"): trigger = CronTrigger(day_of_week=rep.split(":")[1], hour=h, minute=m)
                 else: trigger = DateTrigger(run_date=f"{datetime.date.today()} {t_str}")
             if trigger: scheduler.add_job(notify_engine, trigger, args=[r], id=r['id'])
-        except Exception as e: logger.error(f"Schedule error: {e}")
+        except Exception as e: logger.error(f"调度任务失败: {e}")
     if not scheduler.running: scheduler.start()
 
 # --- API ---
@@ -142,5 +146,5 @@ def mod_settings():
 if __name__ == "__main__":
     from waitress import serve
     update_scheduler()
-    logger.info("Life Reminder Engine v2.0.0 Started.")
+    logger.info("Life Reminder 核心引擎 [v2.0.0] 启动成功。")
     serve(app, host="0.0.0.0", port=int(os.getenv("APP_PORT", 5000)))
