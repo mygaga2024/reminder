@@ -2,423 +2,446 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Life Reminder Pro</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Reminder Pro | Premium Experience</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --p-h: #F44336; --p-m: #FFC107; --p-l: #4CAF50;
-            --primary: #007AFF; --primary-light: #E5F1FF;
-            --bg: #F2F2F7; --surf: #FFFFFF; --text: #1C1C1E; --text-sec: #8E8E93;
-            --border: #E5E5EA; --shadow: rgba(0,0,0,0.05);
+            --p-h: #FF3B30; --p-m: #FF9500; --p-l: #34C759;
+            --primary: #007AFF; --primary-grad: linear-gradient(135deg, #007AFF, #5856D6);
+            --bg: #F2F2F7; --surf: #FFFFFF; --text: #000000; --text-sec: #8E8E93;
+            --border: rgba(0,0,0,0.05); --round: 24px;
         }
 
         [data-theme="dark"] {
             --bg: #000000; --surf: #1C1C1E; --text: #FFFFFF; --text-sec: #8E8E93;
-            --border: #38383A; --primary-light: #1C1C1E;
+            --border: rgba(255,255,255,0.1);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
         body { 
-            font-family: 'Inter', system-ui; 
-            background: #000; /* 纯黑背景，突出中间 */
+            font-family: 'Outfit', sans-serif; 
+            background: #000; 
             color: var(--text); 
-            transition: background 0.3s; 
             height: 100vh; 
             display: flex; 
             justify-content: center; 
             align-items: center; 
             overflow: hidden; 
+            transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* Phone Mockup Container */
-        .app-wrapper {
+        /* Standardized Phone Frame */
+        .app-shell {
             width: 100vw;
-            max-width: 414px; /* iPhone Max Width */
-            height: 92vh;
-            max-height: 850px;
+            max-width: 414px;
+            height: 94vh;
+            max-height: 860px;
             background: var(--bg);
             display: flex;
             flex-direction: column;
             position: relative;
-            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
-            border-radius: 40px;
-            border: 8px solid #333; /* 模拟手机边框 */
+            box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+            border-radius: 48px;
+            border: 10px solid #222;
             overflow: hidden;
-            transition: 0.3s;
+            z-index: 10;
         }
 
-        .main-container { flex: 1; overflow-y: auto; padding: 20px; position: relative; }
+        .screen { flex: 1; overflow-y: auto; padding: 24px; padding-bottom: 100px; scroll-behavior: smooth; }
         .view { display: none; }
-        .view.active { display: block; animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .view.active { display: block; animation: viewIn 0.5s cubic-bezier(0.19, 1, 0.22, 1); }
+        @keyframes viewIn { from { opacity: 0; transform: scale(0.96) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 
-        /* Navigation */
-        .bottom-nav {
-            height: 80px; background: var(--surf); border-top: 1px solid var(--border);
-            display: flex; justify-content: space-around; padding-top: 10px; z-index: 100;
+        /* Typography & Components */
+        .h-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.5px; }
+        .badge { padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; background: var(--primary-light); color: var(--primary); }
+
+        /* Dashboard Highlights */
+        .hero-card {
+            background: var(--primary-grad);
+            border-radius: var(--round);
+            padding: 24px;
+            color: white;
+            margin-bottom: 30px;
+            box-shadow: 0 15px 30px rgba(0,122,255,0.2);
+            position: relative;
+            overflow: hidden;
         }
-        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-sec); cursor: pointer; flex: 1; transition: 0.2s; }
-        .nav-item.active { color: var(--primary); }
-        .nav-item i { font-size: 1.4rem; }
-        .nav-item span { font-size: 0.7rem; font-weight: 500; }
+        .hero-card::after { content: ''; position: absolute; right: -20px; top: -20px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; }
+        .hero-title { font-size: 0.9rem; opacity: 0.8; margin-bottom: 8px; }
+        .hero-main { font-size: 1.6rem; font-weight: 700; margin-bottom: 15px; }
+        .progress-bar { height: 8px; background: rgba(255,255,255,0.2); border-radius: 10px; overflow: hidden; }
+        .progress-inner { height: 100%; background: #fff; width: 0%; transition: 1s ease-out; }
 
-        /* Header */
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-        header h1 { font-size: 1.8rem; font-weight: 700; }
-        .add-circle { width: 44px; height: 44px; background: var(--primary); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; box-shadow: 0 4px 12px rgba(0,122,255,0.3); }
+        /* Category Filter */
+        .cat-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 15px; margin-bottom: 10px; scrollbar-width: none; }
+        .cat-item { 
+            padding: 10px 20px; background: var(--surf); border: 1px solid var(--border); border-radius: 100px; 
+            font-size: 0.85rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: 0.2s;
+        }
+        .cat-item.active { background: var(--text); color: var(--surf); border-color: var(--text); }
 
-        /* Reminder Cards */
-        .card { background: var(--surf); border-radius: 20px; padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 20px var(--shadow); position: relative; overflow: hidden; border-left: 6px solid var(--p-l); transition: 0.3s; }
-        .card.p-high { border-left-color: var(--p-h); }
-        .card.p-mid { border-left-color: var(--p-m); }
-        .card.completed { opacity: 0.5; filter: grayscale(1); transform: scale(0.98); }
-        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-        .card-title { font-weight: 600; font-size: 1.2rem; margin-right: 10px; }
-        .card-time { color: var(--primary); font-weight: 700; font-size: 1rem; }
-        .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; }
-        .channel-icons { display: flex; gap: 8px; color: var(--text-sec); font-size: 0.8rem; }
-        .btn-check { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        .completed .btn-check { background: var(--primary); border-color: var(--primary); color: white; }
+        /* Reminder Items - Redesigned */
+        .item-group-title { font-size: 0.75rem; color: var(--text-sec); text-transform: uppercase; letter-spacing: 1px; margin: 20px 0 12px 5px; }
+        .item-card {
+            background: var(--surf);
+            border-radius: var(--round);
+            padding: 18px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 2px 15px var(--shadow);
+            transition: 0.3s;
+            border: 1px solid transparent;
+        }
+        .item-card:hover { transform: translateY(-2px); border-color: var(--primary); }
+        .priority-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+        .dot-high { background: var(--p-h); box-shadow: 0 0 10px rgba(255,59,48,0.4); }
+        .dot-mid { background: var(--p-m); box-shadow: 0 0 10px rgba(255,149,0,0.4); }
+        .dot-low { background: var(--p-l); box-shadow: 0 0 10px rgba(52,199,89,0.4); }
+        
+        .item-content { flex: 1; }
+        .item-name { font-weight: 600; font-size: 1.05rem; margin-bottom: 2px; }
+        .item-time { font-weight: 500; font-size: 0.85rem; color: var(--primary); }
+        
+        .btn-action { 
+            width: 36px; height: 36px; border-radius: 50%; background: var(--bg); display: flex; 
+            align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; color: var(--text-sec);
+        }
+        .btn-action:hover { background: var(--primary-grad); color: white; }
+        .completed .item-name { text-decoration: line-through; opacity: 0.5; }
 
-        /* Journal View */
-        .journal-stat { background: var(--primary); color: white; padding: 20px; border-radius: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-        .chart-container { background: var(--surf); padding: 15px; border-radius: 20px; margin-bottom: 25px; box-shadow: 0 4px 15px var(--shadow); }
-        .timeline { position: relative; padding-left: 20px; border-left: 2px solid var(--border); }
-        .timeline-item { position: relative; margin-bottom: 25px; padding-left: 20px; }
-        .timeline-item::after { content: ''; position: absolute; left: -27px; top: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--primary); border: 2px solid var(--surf); }
+        /* Bottom Nav - Floating Style */
+        .nav-dock {
+            position: absolute; bottom: 20px; left: 20px; right: 20px;
+            height: 70px; background: rgba(var(--surf-rgb), 0.8); backdrop-filter: blur(20px);
+            border-radius: 35px; border: 1px solid var(--border);
+            display: flex; justify-content: space-around; align-items: center; z-index: 100;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        .tab { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--text-sec); cursor: pointer; transition: 0.3s; }
+        .tab.active { color: var(--primary); }
+        .tab i { font-size: 1.4rem; }
+        .tab span { font-size: 0.7rem; font-weight: 600; }
+        
+        .btn-add-main {
+            width: 56px; height: 56px; background: var(--primary-grad); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; transform: translateY(-20px);
+            box-shadow: 0 10px 25px rgba(0,122,255,0.4); color: white; font-size: 1.5rem; transition: 0.3s;
+        }
+        .btn-add-main:hover { transform: translateY(-25px) rotate(90deg); }
 
-        /* Modal / Form */
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; display: none; }
-        .modal-bg { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); }
-        .modal-content { position: absolute; bottom: 0; width: 100%; max-width: 414px; left: 50%; transform: translateX(-50%); background: var(--surf); border-radius: 30px 30px 0 0; padding: 30px; animation: slideUp 0.4s cubic-bezier(0.19, 1, 0.22, 1); }
-        @keyframes slideUp { from { transform: translate(-50%, 100%); } to { transform: translate(-50%, 0); } }
+        /* Interaction Panel (Action Sheet) */
+        .sheet { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: none; }
+        .sheet-overlay { position: absolute; width:100%; height:100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); }
+        .sheet-body { 
+            position: absolute; bottom: 0; width: 100%; max-width: 414px; left: 50%; transform: translateX(-50%); 
+            background: var(--surf); border-radius: 32px 32px 0 0; padding: 32px; 
+            animation: sheetUp 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+        @keyframes sheetUp { from { transform: translate(-50%, 100%); } to { transform: translate(-50%, 0); } }
+        
+        .sheet-handle { width: 40px; height: 5px; background: var(--border); border-radius: 10px; margin: 0 auto 25px; }
+        .form-label { font-size: 0.75rem; font-weight: 700; color: var(--text-sec); text-transform: uppercase; margin-bottom: 10px; display: block; }
+        .input-pill { width:100%; background: var(--bg); border:none; border-radius: 16px; padding: 18px; font-size: 1rem; color: var(--text); margin-bottom: 24px; outline: none; font-weight: 500; }
+        .btn-submit { width:100%; padding:20px; background: var(--primary-grad); color:white; border-radius: 18px; border:none; font-weight:700; font-size:1.1rem; cursor:pointer; }
 
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-sec); margin-bottom: 8px; text-transform: uppercase; }
-        .f-input { width: 100%; background: var(--bg); border: none; border-radius: 12px; padding: 15px; font-size: 1rem; color: var(--text); outline: none; }
-        .f-input:focus { box-shadow: 0 0 0 2px var(--primary); }
+        /* Stats & Logs */
+        .log-item { display: flex; align-items: center; gap: 15px; padding: 15px 0; border-bottom: 1px solid var(--border); }
+        .log-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; }
+        .log-info h4 { font-size: 1rem; font-weight: 600; }
+        .log-info p { font-size: 0.8rem; color: var(--text-sec); }
 
-        .grid-toggles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-        .toggle-box { background: var(--bg); border-radius: 12px; padding: 15px; text-align: center; cursor: pointer; transition: 0.2s; border: 2px solid transparent; }
-        .toggle-box.active { background: var(--primary-light); border-color: var(--primary); color: var(--primary); }
-        .toggle-box i { font-size: 1.2rem; display: block; margin-bottom: 5px; }
-
-        .btn-set { display: flex; gap: 10px; margin-top: 20px; }
-        .btn { flex: 1; padding: 16px; border-radius: 15px; border: none; font-weight: 600; font-size: 1rem; cursor: pointer; text-align: center; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-cancel { background: var(--border); color: var(--text); }
-
-        /* Time Picker Fix */
-        .tp-dialog { text-align: center; padding: 20px; }
-        .tp-wheel { font-size: 2rem; display: flex; justify-content: center; gap: 15px; margin: 20px 0; font-weight: 700; color: var(--primary); }
-        .tp-wheel input { width: 70px; text-align: center; border: none; background: var(--primary-light); border-radius: 12px; padding: 10px; font-size: 2rem; font-weight: 700; color: var(--primary); outline: none; }
-
-        /* Settings view specific */
-        .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 18px 0; border-bottom: 1px solid var(--border); }
-        .setting-info h4 { font-size: 1rem; margin-bottom: 2px; }
-        .setting-info p { font-size: 0.8rem; color: var(--text-sec); }
+        /* Empty State */
+        .empty { text-align: center; padding-top: 60px; color: var(--text-sec); }
+        .empty i { font-size: 4rem; opacity: 0.1; margin-bottom: 20px; display: block; }
 
     </style>
 </head>
 <body data-theme="dark">
 
-<div class="app-wrapper">
-    <div class="main-container">
+<div class="app-shell">
+    <!-- Main Screens -->
+    <div class="screen">
         
-        <!-- View 1: Reminders -->
-        <div id="viewList" class="view active">
-            <header>
-                <h1 data-i18n="reminders">Reminders</h1>
-                <div class="add-circle" onclick="openModal('addRem')"><i class="fas fa-plus"></i></div>
+        <!-- Tab 1: Dashboard -->
+        <div id="viewFocus" class="view active">
+            <header class="h-row">
+                <h1 id="greeting">Hello, Gaga</h1>
+                <div class="badge" id="dateStr">Apr 10</div>
             </header>
-            <div id="reminderList">
-                <!-- Dynamic List -->
+
+            <div class="hero-card">
+                <div class="hero-title">Next Task</div>
+                <div class="hero-main" id="nextTask">Review Market Data</div>
+                <div class="progress-bar"><div class="progress-inner" id="todayProg"></div></div>
+                <div style="font-size: 0.75rem; margin-top: 10px; opacity: 0.8;" id="progText">4 of 5 completed</div>
+            </div>
+
+            <div class="cat-scroll">
+                <div class="cat-item active" data-cat="all">All Items</div>
+                <div class="cat-item" data-cat="work">Work</div>
+                <div class="cat-item" data-cat="life">Life</div>
+                <div class="cat-item" data-cat="health">Health</div>
+                <div class="cat-item" data-cat="finance">Bills</div>
+            </div>
+
+            <div id="remindersContainer">
+                <!-- Grouped Items -->
             </div>
         </div>
 
-        <!-- View 2: Journal -->
-        <div id="viewLogs" class="view">
-            <header><h1 data-i18n="journal">Journal</h1></header>
-            <div class="journal-stat">
-                <div>
-                    <p data-i18n="completion_rate" style="font-size:0.9rem; opacity:0.8;">Completion Rate</p>
-                    <h2 id="weeklyRate">95%</h2>
-                </div>
-                <i class="fas fa-chart-line fa-2x"></i>
+        <!-- Tab 2: Analysis -->
+        <div id="viewStats" class="view">
+            <h1 style="margin-bottom:20px">Analytics</h1>
+            <div style="background:var(--surf); padding:20px; border-radius:var(--round); margin-bottom:25px;">
+                <canvas id="mainChart" height="200"></canvas>
             </div>
-            <div class="chart-container">
-                <canvas id="weeklyChart"></canvas>
-            </div>
-            <div class="timeline" id="logList">
-                <!-- Dynamic Logs -->
+            <div id="logsContainer">
+                <!-- Timeline -->
             </div>
         </div>
 
-        <!-- View 3: Settings -->
-        <div id="viewSettings" class="view">
-            <header><h1 data-i18n="settings">Settings</h1></header>
-            <div class="setting-item">
-                <div class="setting-info">
-                    <h4 data-i18n="language">Language</h4>
-                    <p id="curLang">English</p>
-                </div>
-                <select id="langSelect" onchange="changeLang(this.value)" style="background:transparent; border:none; color:var(--primary); font-weight:600; outline:none;">
-                    <option value="zh">简体中文</option>
-                    <option value="en">English</option>
-                </select>
-            </div>
-            <div class="setting-item">
-                <div class="setting-info">
-                    <h4 data-i18n="dark_mode">Dark Mode</h4>
-                    <p data-i18n="dark_mode_desc">Easy on the eyes</p>
-                </div>
-                <input type="checkbox" id="darkModeToggle" checked onchange="toggleDarkMode()">
-            </div>
-            <div class="setting-item" onclick="openModal('webhooksModal')">
-                <div class="setting-info">
-                    <h4 data-i18n="webhooks">Webhooks</h4>
-                    <p data-i18n="webhooks_desc">Configure bots</p>
-                </div>
+        <!-- Tab 3: Settings -->
+        <div id="viewConfig" class="view">
+            <h1 style="margin-bottom:20px">Settings</h1>
+            <div class="item-card" onclick="toggleTheme()">
+                <div class="log-icon"><i class="fas fa-moon"></i></div>
+                <div class="item-content"><div class="item-name">Dark Mode</div><div class="item-time">Current: On</div></div>
                 <i class="fas fa-chevron-right text-sec"></i>
             </div>
-            <div class="setting-item">
-                <div class="setting-info">
-                    <h4>About</h4>
-                    <p>Life Reminder v1.2.0 • Pro Edition</p>
-                </div>
-            </div>
+            <!-- More settings... -->
         </div>
+
     </div>
 
-    <!-- Bottom Navigation -->
-    <div class="bottom-nav">
-        <div class="nav-item active" onclick="switchTab('List', this)">
-            <i class="fas fa-list-ul"></i>
-            <span data-i18n="reminders">Reminders</span>
+    <!-- Floating Navigation Dock -->
+    <div class="nav-dock">
+        <div class="tab active" onclick="showView('Focus', this)">
+            <i class="fas fa-compass"></i>
+            <span>Focus</span>
         </div>
-        <div class="nav-item" onclick="switchTab('Logs', this)">
-            <i class="fas fa-calendar-check"></i>
-            <span data-i18n="journal">Journal</span>
+        <div class="btn-add-main" onclick="openSheet()">
+            <i class="fas fa-plus"></i>
         </div>
-        <div class="nav-item" onclick="switchTab('Settings', this)">
-            <i class="fas fa-sliders-h"></i>
-            <span data-i18n="settings">Settings</span>
+        <div class="tab" onclick="showView('Stats', this)">
+            <i class="fas fa-chart-pie"></i>
+            <span>Insights</span>
         </div>
     </div>
 </div>
 
-<!-- Modals -->
-<div class="modal" id="addRem">
-    <div class="modal-bg" onclick="closeModal()"></div>
-    <div class="modal-content">
-        <div class="form-group">
-            <label data-i18n="title">Title</label>
-            <input type="text" id="f_title" class="f_input" placeholder="Call Mom...">
-        </div>
-        <div class="form-group">
-            <label data-i18n="time">Time</label>
-            <div class="tp-wheel">
-                <input type="number" id="f_h" min="0" max="23" value="08">
-                <span>:</span>
-                <input type="number" id="f_m" min="0" max="59" value="00">
+<!-- Add Sheet -->
+<div class="sheet" id="addSheet">
+    <div class="sheet-overlay" onclick="closeSheet()"></div>
+    <div class="sheet-body">
+        <div class="sheet-handle"></div>
+        <h2 style="margin-bottom:30px">New Task</h2>
+        
+        <label class="form-label">What's on your mind?</label>
+        <input type="text" id="f_title" class="input-pill" placeholder="e.g. Gym Session">
+        
+        <div style="display:flex; gap:15px; margin-bottom:24px;">
+            <div style="flex:1">
+                <label class="form-label">Trigger Time</label>
+                <input type="time" id="f_time" class="input-pill" style="margin-bottom:0">
+            </div>
+            <div style="flex:1">
+                <label class="form-label">Priority</label>
+                <select id="f_priority" class="input-pill" style="margin-bottom:0">
+                    <option value="low">Low</option>
+                    <option value="mid">Medium</option>
+                    <option value="high">Urgent</option>
+                </select>
             </div>
         </div>
-        <div class="form-group">
-            <label data-i18n="priority">Priority</label>
-            <div class="grid-toggles" id="f_priority">
-                <div class="toggle-box active" data-val="low" style="color:var(--p-l)"><i class="fas fa-flag"></i>Low</div>
-                <div class="toggle-box" data-val="mid" style="color:var(--p-m)"><i class="fas fa-flag"></i>Mid</div>
-                <div class="toggle-box" data-val="high" style="color:var(--p-h)"><i class="fas fa-flag"></i>High</div>
-            </div>
-        </div>
-        <div class="form-group">
-            <label data-i18n="notify_channels">Channels</label>
-            <div class="grid-toggles" id="f_channels">
-                <div class="toggle-box active" data-val="system"><i class="fas fa-bell"></i>System</div>
-                <div class="toggle-box" data-val="wechat"><i class="fab fa-weixin"></i>WeChat</div>
-                <div class="toggle-box" data-val="email"><i class="fas fa-envelope"></i>Email</div>
-            </div>
-        </div>
-        <div class="btn-set">
-            <button class="btn btn-cancel" onclick="closeModal()" data-i18n="cancel">Cancel</button>
-            <button class="btn btn-primary" onclick="saveReminder()" data-i18n="save">Save</button>
-        </div>
-    </div>
-</div>
 
-<div class="modal" id="webhooksModal">
-    <div class="modal-bg" onclick="closeModal()"></div>
-    <div class="modal-content">
-        <h3 style="margin-bottom:20px">Webhook Configuration</h3>
-        <div class="form-group">
-            <label>Enterprise WeChat</label>
-            <input type="text" id="w_wecom" class="f_input" placeholder="Webhook URL...">
+        <label class="form-label">Category</label>
+        <div class="cat-scroll" id="f_cat_picker">
+            <div class="cat-item active" data-val="work">Work</div>
+            <div class="cat-item" data-val="life">Life</div>
+            <div class="cat-item" data-val="health">Health</div>
+            <div class="cat-item" data-val="finance">Bills</div>
         </div>
-        <div class="form-group">
-            <label>DingTalk / Lark</label>
-            <input type="text" id="w_dingtalk" class="f_input" placeholder="Webhook URL...">
-        </div>
-        <div class="btn-set">
-            <button class="btn btn-primary" onclick="saveSettings()" style="width:100%" data-i18n="confirm">Confirm</button>
-        </div>
+
+        <button class="btn-submit" onclick="submitReminder()">Add Task</button>
     </div>
 </div>
 
 <script>
-    const i18n = {
-        zh: {
-            reminders: "提醒事项", journal: "执行日志", settings: "设置",
-            title: "标题", time: "时间", priority: "优先级", notify_channels: "推送渠道",
-            cancel: "取消", save: "保存", confirm: "确认", 
-            completion_rate: "本周完成率", language: "语言", dark_mode: "黑暗模式",
-            dark_mode_desc: "保护您的视力", low: "低", mid: "中", high: "高"
-        },
-        en: {
-            reminders: "Reminders", journal: "Journal", settings: "Settings",
-            title: "Title", time: "Time", priority: "Priority", notify_channels: "Channels",
-            cancel: "Cancel", save: "Save", confirm: "Confirm",
-            completion_rate: "Weekly Rate", language: "Language", dark_mode: "Dark Mode",
-            dark_mode_desc: "Easy on the eyes", low: "Low", mid: "Mid", high: "High"
-        }
-    };
+    let state = { db: { reminders: [], settings: {} }, logs: [] };
+    let chart = null;
 
-    let appData = { config: { reminders: [], settings: {} }, logs: [] };
-    let chartInstance = null;
-
-    async function fetchData() {
-        const res = await fetch('/api/data');
-        appData = await res.json();
+    async function sync() {
+        const res = await fetch('/api/state');
+        state = await res.json();
+        
+        // Update UI
         renderReminders();
-        renderLogs();
-        updateChart();
-    }
-
-    function switchTab(viewId, el) {
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-        document.getElementById('view' + viewId).classList.add('active');
-        el.classList.add('active');
-        if (viewId === 'Logs') updateChart();
+        renderStats();
+        updateSummary();
+        
+        // Handlers for dynamic UI
+        document.getElementById('dateStr').textContent = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const hr = new Date().getHours();
+        document.getElementById('greeting').textContent = hr < 12 ? 'Good Morning' : hr < 18 ? 'Good Afternoon' : 'Good Evening';
     }
 
     function renderReminders() {
-        const list = document.getElementById('reminderList');
-        const items = appData.config.reminders;
-        list.innerHTML = items.map(r => `
-            <div class="card p-${r.priority || 'low'} ${r.status === 'completed' ? 'completed' : ''}">
-                <div class="card-header">
-                    <span class="card-title">${r.title}</span>
-                    <span class="card-time">${r.time}</span>
-                </div>
-                <div class="card-footer">
-                    <div class="channel-icons">
-                        <i class="fas fa-bell"></i>
-                        ${r.channels && r.channels.includes('wechat') ? '<i class="fab fa-weixin"></i>' : ''}
-                    </div>
-                    <div class="btn-check" onclick="toggleComplete('${r.id}')">
-                        <i class="fas fa-check"></i>
-                    </div>
-                </div>
-            </div>
-        `).join('');
-    }
+        const container = document.getElementById('remindersContainer');
+        const items = state.db.reminders;
+        
+        if (items.length === 0) {
+            container.innerHTML = `<div class="empty"><i class="fas fa-peace"></i>Everything is clear today</div>`;
+            return;
+        }
 
-    function renderLogs() {
-        const container = document.getElementById('logList');
-        const logs = appData.logs;
-        container.innerHTML = logs.reverse().map(l => `
-            <div class="timeline-item">
-                <div style="font-weight:600; font-size:1rem;">${l.title}</div>
-                <div style="font-size:0.8rem; color:var(--text-sec);">
-                    ${l.triggered_at.split('T')[1].substring(0,5)} -> ${l.completed_at ? 'Done at ' + l.completed_at.split('T')[1].substring(0,5) : 'Triggered'}
-                </div>
-            </div>
-        `).join('');
-    }
+        // Group by priority for focus
+        const groups = { high: [], mid: [], low: [] };
+        items.filter(r => r.status === 'pending').forEach(r => groups[r.priority || 'low'].push(r));
 
-    async function toggleComplete(rid) {
-        const r = appData.config.reminders.find(x => x.id === rid);
-        const newStatus = r.status === 'completed' ? 'pending' : 'completed';
-        await fetch(`/api/reminders/${rid}`, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ status: newStatus })
+        let html = '';
+        ['high', 'mid', 'low'].forEach(p => {
+            if (groups[p].length > 0) {
+                html += `<div class="item-group-title">${p} priority</div>`;
+                groups[p].forEach(r => {
+                    html += `
+                        <div class="item-card">
+                            <div class="priority-dot dot-${r.priority}"></div>
+                            <div class="item-content">
+                                <div class="item-name">${r.title}</div>
+                                <div class="item-time"><i class="far fa-clock"></i> ${r.time}</div>
+                            </div>
+                            <div class="btn-action" onclick="markDone('${r.id}')"><i class="fas fa-check"></i></div>
+                            <div class="btn-action" onclick="deleteTask('${r.id}')"><i class="fas fa-trash-alt"></i></div>
+                        </div>
+                    `;
+                });
+            }
         });
-        fetchData();
+        container.innerHTML = html;
     }
 
-    async function saveReminder() {
-        const title = document.getElementById('f_title').value;
-        const h = document.getElementById('f_h').value.padStart(2, '0');
-        const m = document.getElementById('f_m').value.padStart(2, '0');
-        const priority = document.querySelector('#f_priority .active').dataset.val;
-        const channels = Array.from(document.querySelectorAll('#f_channels .active')).map(el => el.dataset.val);
+    function renderStats() {
+        const logC = document.getElementById('logsContainer');
+        logC.innerHTML = state.logs.slice().reverse().map(l => `
+            <div class="log-item">
+                <div class="log-icon"><i class="fas fa-check"></i></div>
+                <div class="log-info">
+                    <h4>${l.title}</h4>
+                    <p>${new Date(l.triggered_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} • ${l.status}</p>
+                </div>
+            </div>
+        `).join('');
 
-        if (!title) return alert('Please enter a title');
+        if (state.logs.length > 0) updateChart();
+    }
 
-        const res = await fetch('/api/reminders', {
+    function updateSummary() {
+        const pending = state.db.reminders.filter(r => r.status === 'pending');
+        const completed = state.db.reminders.filter(r => r.status === 'completed');
+        const total = pending.length + completed.length;
+        
+        const prog = total > 0 ? (completed.length / total) * 100 : 0;
+        document.getElementById('todayProg').style.width = prog + '%';
+        document.getElementById('progText').textContent = `${completed.length} of ${total} tasks completed`;
+        
+        if (pending.length > 0) {
+            // Find earliest next task
+            const next = pending.sort((a,b) => a.time.localeCompare(b.time))[0];
+            document.getElementById('nextTask').textContent = next.title;
+        } else {
+            document.getElementById('nextTask').textContent = 'Well Done!';
+        }
+    }
+
+    async function submitReminder() {
+        const task = {
+            title: document.getElementById('f_title').value,
+            time: document.getElementById('f_time').value,
+            priority: document.getElementById('f_priority').value,
+            category: document.querySelector('#f_cat_picker .active').dataset.val,
+            repeat: 'daily'
+        };
+        if (!task.title || !task.time) return alert('Details needed!');
+        
+        await fetch('/api/reminders', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ title, time: `${h}:${m}`, priority, channels, repeat: 'daily' })
+            body: JSON.stringify(task)
         });
-        if (res.ok) { closeModal(); fetchData(); }
+        closeSheet();
+        sync();
+    }
+
+    async function markDone(id) {
+        await fetch(`/api/reminders/${id}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ status: 'completed' })
+        });
+        sync();
+    }
+
+    async function deleteTask(id) {
+        if (!confirm('Discard this task?')) return;
+        await fetch(`/api/reminders/${id}`, { method: 'DELETE' });
+        sync();
     }
 
     function updateChart() {
-        const ctx = document.getElementById('weeklyChart').getContext('2d');
-        if (chartInstance) chartInstance.destroy();
-        chartInstance = new Chart(ctx, {
-            type: 'bar',
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if (chart) chart.destroy();
+        chart = new Chart(ctx, {
+            type: 'line',
             data: {
                 labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
                 datasets: [{
-                    label: 'Tasks Completed',
-                    data: [12, 19, 3, 5, 2, 3, 9],
-                    backgroundColor: '#007AFF',
-                    borderRadius: 10,
+                    data: [12, 19, 13, 15, 22, 13, 15],
+                    borderColor: '#007AFF',
+                    tension: 0.4,
+                    fill: true,
+                    backgroundColor: 'rgba(0,122,255,0.1)'
                 }]
             },
             options: {
-                responsive: true,
                 plugins: { legend: { display: false } },
-                scales: { y: { display: false }, x: { grid: { display: false } } }
+                scales: { x: { grid: { display: false } }, y: { display: false } }
             }
         });
     }
 
-    function openModal(id) { document.getElementById(id).style.display = 'block'; }
-    function closeModal() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
-
-    function toggleDarkMode() {
-        const theme = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        document.body.setAttribute('data-theme', theme);
+    function showView(name, el) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('view' + name).classList.add('active');
+        el.classList.add('active');
     }
 
-    function changeLang(l) {
-        document.querySelectorAll('[data-i18n]').forEach(el => {
-            const key = el.getAttribute('data-i18n');
-            el.innerText = i18n[l][key] || key;
-        });
-        document.getElementById('curLang').innerText = l === 'zh' ? '简体中文' : 'English';
+    function openSheet() { document.getElementById('addSheet').style.display = 'block'; }
+    function closeSheet() { document.getElementById('addSheet').style.display = 'none'; }
+    
+    function toggleTheme() {
+        const t = document.body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        document.body.setAttribute('data-theme', t);
     }
 
-    document.querySelectorAll('.toggle-box').forEach(box => {
-        box.onclick = () => {
-            if (box.parentElement.id === 'f_priority') {
-                box.parentElement.querySelectorAll('.toggle-box').forEach(b => b.classList.remove('active'));
-                box.classList.add('active');
-            } else {
-                box.classList.toggle('active');
-            }
+    // Init Logic
+    sync();
+    setInterval(sync, 10000);
+
+    // Dynamic Category Selection
+    document.querySelectorAll('#f_cat_picker .cat-item').forEach(i => {
+        i.onclick = () => {
+            i.parentElement.querySelectorAll('.cat-item').forEach(x => x.classList.remove('active'));
+            i.classList.add('active');
         };
     });
-
-    fetchData();
-    changeLang('zh');
 </script>
 
 </body>
