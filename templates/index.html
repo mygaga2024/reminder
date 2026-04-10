@@ -461,6 +461,24 @@ input, select, button, textarea { font-family: inherit; }
 .cal-btn-cancel { background: var(--c-surface2); color: var(--c-text); }
 .cal-btn-confirm { background: var(--c-blue); color: #fff; }
 
+/* Custom Time Picker */
+.tp-wrap {
+    background: var(--c-bg); border: 1px solid var(--c-border);
+    border-radius: var(--radius); padding: 12px; margin-top: 8px;
+    display: none; animation: fadeIn 0.2s;
+}
+.tp-cols { display: flex; gap: 10px; margin-bottom: 12px; }
+.tp-list {
+    flex: 1; height: 140px; background: var(--c-surface2); border: none; border-radius: 12px;
+    color: var(--c-text); outline: none; padding: 4px; font-size: 1rem;
+    scrollbar-width: none; font-family: 'JetBrains Mono', monospace; text-align: center;
+}
+.tp-list::-webkit-scrollbar { display: none; }
+.tp-list option {
+    padding: 8px; border-radius: 8px; margin-bottom: 2px;
+}
+.tp-list option:checked { background: var(--c-blue); color: #fff; font-weight: bold; }
+
     </style>
 </head>
 <body>
@@ -599,7 +617,14 @@ input, select, button, textarea { font-family: inherit; }
         <div style="display:flex; gap:12px">
             <div class="field" style="flex:1">
                 <label>提醒时间</label>
-                <input type="time" id="f_time" value="09:00" onchange="this.blur()">
+                <input type="text" id="f_time" value="09:00" readonly onclick="toggleTimePicker()">
+                <div class="tp-wrap" id="timePickerBox">
+                    <div class="tp-cols">
+                        <select id="tp_hour" class="tp-list" size="5"></select>
+                        <select id="tp_min" class="tp-list" size="5"></select>
+                    </div>
+                    <button class="cal-btn-confirm" style="width:100%; padding:12px; border:none; border-radius:10px; font-weight:600; cursor:pointer;" onclick="confirmTime()">确定时间</button>
+                </div>
             </div>
             <div class="field" style="flex:1">
                 <label>优先级</label>
@@ -1010,6 +1035,39 @@ function pickRepeat(el) {
     if (val === 'once') renderCalendar();
 }
 
+// ─── Time Picker (需求1，2) ───
+function initTimePicker() {
+    const hSelect = document.getElementById('tp_hour');
+    const mSelect = document.getElementById('tp_min');
+    if (hSelect.options.length === 0) {
+        for (let i = 0; i < 24; i++) hSelect.innerHTML += `<option value="${String(i).padStart(2,'0')}">${String(i).padStart(2,'0')}</option>`;
+        for (let i = 0; i < 60; i++) mSelect.innerHTML += `<option value="${String(i).padStart(2,'0')}">${String(i).padStart(2,'0')}</option>`;
+    }
+}
+function toggleTimePicker() {
+    const box = document.getElementById('timePickerBox');
+    if (box.style.display === 'block') {
+        box.style.display = 'none';
+    } else {
+        initTimePicker();
+        const parts = document.getElementById('f_time').value.split(':');
+        document.getElementById('tp_hour').value = parts[0] || '09';
+        document.getElementById('tp_min').value = parts[1] || '00';
+        box.style.display = 'block';
+        // Auto scroll to make selected visible
+        setTimeout(() => {
+            document.getElementById('tp_hour').querySelector('option:checked')?.scrollIntoView({block:'center'});
+            document.getElementById('tp_min').querySelector('option:checked')?.scrollIntoView({block:'center'});
+        }, 10);
+    }
+}
+function confirmTime() {
+    const h = document.getElementById('tp_hour').value;
+    const m = document.getElementById('tp_min').value;
+    document.getElementById('f_time').value = `${h}:${m}`;
+    document.getElementById('timePickerBox').style.display = 'none';
+}
+
 // ─── Calendar Picker (需求3) ───
 let calYear, calMonth, calSelectedDate = null;
 function renderCalendar(y, m) {
@@ -1177,6 +1235,7 @@ function openSheet(id) {
         document.getElementById('weekdayField').style.display = 'none';
         document.getElementById('dateField').style.display = 'none';
         document.querySelectorAll('#weekdayPicker .chip').forEach(c => c.classList.remove('active'));
+        document.getElementById('timePickerBox').style.display = 'none';
     }
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('sheet-' + id).style.display = 'block';
