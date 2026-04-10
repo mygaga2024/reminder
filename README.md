@@ -25,7 +25,7 @@
 ```yaml
 services:
   reminder:
-    image: ghcr.io/mygaga2024/reminder:v1.0.1
+    image: ghcr.io/mygaga2024/reminder:v1.1.0
     ports:
       - "5000:5000"
     volumes:
