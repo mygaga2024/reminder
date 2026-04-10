@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # 数据目录与文件
 DATA_DIR = os.getenv("DATA_DIR", "/app/data")
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
-HISTORY_FILE = os.path.join(DATA_DIR, "reminder_history.json")
+LOGS_FILE = os.path.join(DATA_DIR, "logs.json")
 
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR)
@@ -34,134 +34,96 @@ app = Flask(__name__)
 CORS(app)
 scheduler = BackgroundScheduler(timezone=os.getenv("TZ", "Asia/Shanghai"))
 
-def load_config():
-    """加载配置与提醒项"""
-    default_config = {
-        "reminders": [], # [{id, title, time, repeat, status, notes, notification_types}]
-        "settings": {
-            "email_enabled": False,
-            "smtp_server": "smtp.example.com",
-            "smtp_port": 587,
-            "sender": "",
-            "password": "",
-            "recipient": "",
-            "push_enabled": False,
-            "webhook_url": "",
-            "language": "zh",
-            "time_format": "24h"
-        }
-    }
-    
-    if os.path.exists(CONFIG_FILE):
+def load_json(filepath, default):
+    if os.path.exists(filepath):
         try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                loaded = json.load(f)
-                # 兼容旧版本数据
-                if "reminder_rules" in loaded:
-                    new_reminders = []
-                    for rule in loaded["reminder_rules"]:
-                        new_reminders.append({
-                            "id": str(uuid.uuid4()),
-                            "title": "迁移提醒",
-                            "time": rule.split()[-1] if ' ' in rule else rule,
-                            "repeat": "daily",
-                            "status": "pending",
-                            "notes": f"来自旧版规则: {rule}"
-                        })
-                    loaded["reminders"] = new_reminders
-                    del loaded["reminder_rules"]
-                return loaded
+            with open(filepath, "r", encoding="utf-8") as f:
+                return json.load(f)
         except Exception as e:
-            logger.error(f"加载配置文件失败: {e}")
-            
-    return default_config
+            logger.error(f"Error loading {filepath}: {e}")
+    return default
 
-def save_config(config):
+def save_json(filepath, data):
     try:
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(config, f, ensure_ascii=False, indent=2)
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
         return True
     except Exception as e:
-        logger.error(f"保存配置文件失败: {e}")
+        logger.error(f"Error saving {filepath}: {e}")
         return False
 
-current_config = load_config()
-
-def trigger_reminder(reminder_id):
-    """提醒触发时的回调函数"""
-    reminders = current_config.get("reminders", [])
-    reminder = next((r for r in reminders if r["id"] == reminder_id), None)
-    
-    if not reminder:
-        return
-        
-    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    message = f"【{reminder['title']}】时间到了！({now_str})\n备注: {reminder.get('notes', '无')}"
-    logger.info(f"触发提醒: {message}")
-    
-    # 记录历史
-    save_reminder_history(reminder['id'], message)
-    
-    # 发送通知
-    if current_config["settings"].get("email_enabled"):
-        send_email(f"提醒: {reminder['title']}", message)
-    if current_config["settings"].get("push_enabled"):
-        send_push_notification(message)
-
-def save_reminder_history(reminder_id, message):
-    history = []
-    if os.path.exists(HISTORY_FILE):
-        try:
-            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-                history = json.load(f)
-        except Exception as e:
-            logger.error(f"读取历史文件失败: {e}")
-    
-    new_record = {
-        "timestamp": datetime.datetime.now().isoformat(),
-        "reminder_id": reminder_id,
-        "message": message
+# --- Core Data Structures ---
+# current_config keys: reminders (list), settings (dict)
+current_config = load_json(CONFIG_FILE, {
+    "reminders": [],
+    "settings": {
+        "language": "zh",
+        "dark_mode": True,
+        "email": {"enabled": False, "server": "", "port": 587, "user": "", "pass": "", "to": ""},
+        "webhooks": {"wecom": "", "dingtalk": "", "lark": "", "custom": ""},
+        "sms": {"enabled": False, "api_key": ""},
+        "time_format": "24h"
     }
-    history.append(new_record)
-    if len(history) > 100:
-        history = history[-100:]
-    try:
-        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(history, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        logger.error(f"保存历史文件失败: {e}")
+})
 
-def send_email(subject, message):
+# logs: list of {id, reminder_id, title, triggered_at, completed_at, mood, notes, status}
+reminder_logs = load_json(LOGS_FILE, [])
+
+def notify_all_channels(reminder):
+    """Notify via multiple configured channels."""
     s = current_config["settings"]
-    if not s.get("email_enabled"): return
+    title = reminder["title"]
+    msg = f"【提醒】{title}\n时间: {datetime.datetime.now().strftime('%H:%M:%S')}\n备注: {reminder.get('notes', '无')}"
+    
+    # 1. Email
+    if s["email"]["enabled"]:
+        send_email(f"Reminder: {title}", msg, s["email"])
+    
+    # 2. Webhooks
+    for key, url in s["webhooks"].items():
+        if url:
+            try:
+                if "dingtalk" in key:
+                    requests.post(url, json={"msgtype": "text", "text": {"content": msg}})
+                elif "wecom" in key or "lark" in key:
+                    requests.post(url, json={"msgtype": "text", "text": {"content": msg}})
+                else:
+                    requests.post(url, json={"message": msg})
+            except: pass
+
+    # Log to backend logs
+    log_entry = {
+        "id": str(uuid.uuid4()),
+        "reminder_id": reminder["id"],
+        "title": title,
+        "triggered_at": datetime.datetime.now().isoformat(),
+        "completed_at": None,
+        "status": "triggered"
+    }
+    reminder_logs.append(log_entry)
+    save_json(LOGS_FILE, reminder_logs)
+
+def send_email(subject, message, conf):
     try:
         msg = MIMEMultipart()
-        msg["From"] = s["sender"]
-        msg["To"] = s["recipient"]
+        msg["From"] = conf["user"]
+        msg["To"] = conf["to"]
         msg["Subject"] = subject
         msg.attach(MIMEText(message, "plain"))
-        with smtplib.SMTP(s["smtp_server"], s["smtp_port"]) as server:
+        with smtplib.SMTP(conf["server"], conf["port"]) as server:
             server.starttls()
-            server.login(s["sender"], s["password"])
+            server.login(conf["user"], conf["pass"])
             server.send_message(msg)
     except Exception as e:
-        logger.error(f"邮件发送失败: {e}")
-
-def send_push_notification(message):
-    s = current_config["settings"]
-    if not s.get("push_enabled"): return
-    url = s.get("webhook_url")
-    if not url: return
-    try:
-        requests.post(url, json={"message": message}, timeout=10)
-    except Exception as e:
-        logger.error(f"推送失败: {e}")
+        logger.error(f"Email error: {e}")
 
 def parse_to_trigger(reminder):
-    t_str = reminder["time"]
-    rep = reminder.get("repeat", "daily")
+    t_str = reminder["time"]  # Expecting "HH:mm" or "YYYY-MM-DD HH:mm:ss"
+    rep = reminder.get("repeat", "none")
     
-    # 纯时间 HH:MM:SS 或 HH:MM
+    if re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$', t_str):
+        return DateTrigger(run_date=t_str)
+
     if re.match(r'^\d{1,2}:\d{2}(:\d{2})?$', t_str):
         parts = t_str.split(':')
         h, m = parts[0], parts[1]
@@ -175,11 +137,9 @@ def parse_to_trigger(reminder):
         elif rep.startswith("monthly:"):
             day = rep.split(":")[1]
             return CronTrigger(day=day, hour=h, minute=m, second=s)
-            
-    # 特定日期
-    if re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$', t_str):
-        return DateTrigger(run_date=t_str)
-        
+        elif rep == "none":
+            # Just target today's date
+            return DateTrigger(run_date=f"{datetime.date.today().isoformat()} {t_str}")
     return None
 
 def update_scheduler():
@@ -189,68 +149,72 @@ def update_scheduler():
         try:
             trigger = parse_to_trigger(r)
             if trigger:
-                scheduler.add_job(trigger_reminder, trigger, args=[r["id"]], id=f"job_{r['id']}")
-        except Exception as e:
-            logger.error(f"添加提醒失败 [{r['title']}]: {e}")
-            
+                scheduler.add_job(notify_all_channels, trigger, args=[r], id=f"job_{r['id']}")
+        except: pass
     if not scheduler.running:
         scheduler.start()
 
-# --- API ---
+# --- API Routes ---
 
 @app.route('/')
 def index():
     try:
         with open('templates/index.html', 'r', encoding='utf-8') as f:
             return render_template_string(f.read())
-    except:
-        return "Internal Error: templates/index.html missing"
+    except: return "Error: templates/index.html missing"
 
 @app.route('/api/data', methods=['GET'])
-def get_all_data():
-    return jsonify(current_config)
+def get_data():
+    return jsonify({
+        "config": current_config,
+        "logs": reminder_logs[-50:] # Limit to last 50
+    })
 
 @app.route('/api/reminders', methods=['POST'])
-def add_reminder():
-    reminder = request.json
-    reminder["id"] = str(uuid.uuid4())
-    reminder["status"] = reminder.get("status", "pending")
-    current_config["reminders"].append(reminder)
-    save_config(current_config)
+def add_rem():
+    r = request.json
+    r["id"] = str(uuid.uuid4())
+    r["status"] = "pending"
+    current_config["reminders"].append(r)
+    save_json(CONFIG_FILE, current_config)
     update_scheduler()
-    return jsonify(reminder)
+    return jsonify(r)
 
-@app.route('/api/reminders/<rid>', methods=['PUT'])
-def update_reminder(rid):
-    data = request.json
-    for i, r in enumerate(current_config["reminders"]):
-        if r["id"] == rid:
-            current_config["reminders"][i].update(data)
-            break
-    save_config(current_config)
+@app.route('/api/reminders/<rid>', methods=['PUT', 'DELETE'])
+def handle_rem(rid):
+    if request.method == 'DELETE':
+        current_config["reminders"] = [r for r in current_config["reminders"] if r["id"] != rid]
+    else:
+        data = request.json
+        for i, r in enumerate(current_config["reminders"]):
+            if r["id"] == rid:
+                # If marking as completed, update logs
+                if data.get("status") == "completed" and r["status"] != "completed":
+                    # Find matching log entry to update
+                    for log in reversed(reminder_logs):
+                        if log["reminder_id"] == rid and log["completed_at"] is None:
+                            log["completed_at"] = datetime.datetime.now().isoformat()
+                            log["mood"] = data.get("mood", "😊")
+                            log["notes"] = data.get("log_notes", "")
+                            break
+                    save_json(LOGS_FILE, reminder_logs)
+                
+                current_config["reminders"][i].update(data)
+                break
+    save_json(CONFIG_FILE, current_config)
     update_scheduler()
-    return jsonify({"status": "success"})
-
-@app.route('/api/reminders/<rid>', methods=['DELETE'])
-def delete_reminder(rid):
-    current_config["reminders"] = [r for r in current_config["reminders"] if r["id"] != rid]
-    save_config(current_config)
-    update_scheduler()
-    return jsonify({"status": "success"})
+    return jsonify({"success": True})
 
 @app.route('/api/settings', methods=['POST'])
-def update_settings():
+def save_settings():
     current_config["settings"].update(request.json)
-    save_config(current_config)
+    save_json(CONFIG_FILE, current_config)
     update_scheduler()
-    return jsonify({"status": "success"})
+    return jsonify({"success": True})
 
-@app.route('/api/history', methods=['GET'])
-def get_hist():
-    if os.path.exists(HISTORY_FILE):
-        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-            return jsonify(json.load(f))
-    return jsonify([])
+@app.route('/api/logs', methods=['GET'])
+def get_logs():
+    return jsonify(reminder_logs)
 
 if __name__ == "__main__":
     update_scheduler()
