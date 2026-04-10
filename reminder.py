@@ -166,5 +166,5 @@ def mod_settings():
 if __name__ == "__main__":
     from waitress import serve
     update_scheduler()
-    logger.info("Initializing Life Reminder Pro v2.0-Alpha Engine...")
+    logger.info("Initializing Life Reminder v2.0.0 Engine...")
     serve(app, host="0.0.0.0", port=int(os.getenv("APP_PORT", 5000)))
