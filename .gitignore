@@ -16,3 +16,6 @@ reminder_history.json
 .idea/
 .trae/
 .DS_Store
+
+# Local protocol (not for git)
+.code_protocol.md
