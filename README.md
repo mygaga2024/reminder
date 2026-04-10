@@ -26,6 +26,7 @@
 services:
   reminder:
     image: ghcr.io/mygaga2024/reminder:v1.2.0
+    container_name: reminder
     ports:
       - "5000:5000"
     volumes:
