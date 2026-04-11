@@ -73,10 +73,21 @@ def notify_engine(reminder):
     now_str = datetime.datetime.now().strftime('%H:%M:%S')
     msg = f"⏰ 提醒: {title}\n触发时间: {now_str}"
     
-    for platform, url in s["webhooks"].items():
-        if url:
-            try: requests.post(url, json={"msgtype": "text", "text": {"content": msg}}, timeout=5)
-            except Exception as e: logger.error(f"推送失败 ({platform}): {e}")
+    for platform, url in s.get("webhooks", {}).items():
+        if not url: continue
+        # Handle regular webhooks
+        if platform in ["wecom", "dingtalk", "lark"]:
+            payload = {"msgtype": "text", "text": {"content": msg}}
+            if platform == "lark":
+                payload = {"msg_type": "text", "content": {"text": msg}}
+            try:
+                resp = requests.post(url, json=payload, timeout=5)
+                if resp.status_code != 200 or '"errcode":0' not in resp.text.replace(' ', ''):
+                    logger.error(f"推送警告 ({platform}): {resp.text}")
+                else:
+                    logger.info(f"推送成功 ({platform})")
+            except Exception as e:
+                logger.error(f"推送失败 ({platform}): {e}")
 
     log_entry = {
         "id": str(uuid.uuid4()), "reminder_id": reminder["id"], "title": title,
