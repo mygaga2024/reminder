@@ -602,7 +602,7 @@ input, select, button, textarea { font-family: inherit; }
             </div>
 
             <div class="footer-info">
-                Life Reminder v3.0.4<br>
+                Life Reminder v3.0.5<br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -675,8 +675,12 @@ input, select, button, textarea { font-family: inherit; }
             </div>
         </div>
         <div class="field" id="dateField" style="display:none">
-            <label>选择日期</label>
+            <label id="dateFieldLabel">选择日期</label>
             <div id="calendarPicker"></div>
+            <div id="selectedDateDisplay" style="display:none; align-items:center; justify-content:space-between; background:var(--c-surface2); padding:12px 18px; border-radius:12px; margin-top:4px;">
+                <span id="dateValStr" style="font-size:1.1rem; font-weight:600; color:var(--c-blue); font-family:'JetBrains Mono',monospace;"></span>
+                <button onclick="reopenCalendar()" style="background:var(--c-surface); border:1px solid var(--c-border); color:var(--c-text); cursor:pointer; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 5px rgba(0,0,0,0.05);"><i class="fas fa-pen" style="font-size:0.85rem"></i></button>
+            </div>
             <input type="hidden" id="f_date">
         </div>
         <input type="hidden" id="f_editId" value="">
@@ -913,7 +917,7 @@ function editTask(id) {
     if (!r) return;
     document.getElementById('f_editId').value = r.id;
     document.getElementById('f_title').value = r.title;
-    document.getElementById('f_time').value = r.time;
+    document.getElementById('f_time').value = r.time.includes(' ') ? r.time.split(' ')[1] : r.time;
     document.getElementById('f_prio').value = r.priority || 'low';
     document.getElementById('addSheetTitle').textContent = '编辑任务';
     document.querySelector('#sheet-add .btn-submit').textContent = '保存修改';
@@ -925,6 +929,13 @@ function editTask(id) {
         document.querySelector(`#repeatMode .chip[data-val="${rep}"]`).classList.add('active');
         document.getElementById('weekdayField').style.display = 'none';
         document.getElementById('dateField').style.display = rep === 'once' ? 'block' : 'none';
+        if (rep === 'once') {
+            document.getElementById('f_date').value = r.time.split(' ')[0] || '';
+            document.getElementById('dateFieldLabel').textContent = '提醒日期';
+            document.getElementById('calendarPicker').style.display = 'none';
+            document.getElementById('dateValStr').textContent = document.getElementById('f_date').value;
+            document.getElementById('selectedDateDisplay').style.display = 'flex';
+        }
     } else if (rep.startsWith('weekly:')) {
         document.querySelector('#repeatMode .chip[data-val="weekly"]').classList.add('active');
         document.getElementById('weekdayField').style.display = 'block';
@@ -1084,7 +1095,12 @@ function pickRepeat(el) {
     const val = el.dataset.val;
     document.getElementById('weekdayField').style.display = val === 'weekly' ? 'block' : 'none';
     document.getElementById('dateField').style.display = val === 'once' ? 'block' : 'none';
-    if (val === 'once') renderCalendar();
+    if (val === 'once') {
+        document.getElementById('dateFieldLabel').textContent = '选择日期';
+        document.getElementById('calendarPicker').style.display = 'block';
+        document.getElementById('selectedDateDisplay').style.display = 'none';
+        renderCalendar();
+    }
 }
 
 // ─── Time Picker (需求1，2) ───
@@ -1187,10 +1203,17 @@ function cancelCalendar() {
 function confirmCalendar() {
     if (!calSelectedDate) return;
     document.getElementById('f_date').value = calSelectedDate;
-    // Visual feedback: highlight the confirm button briefly
-    const container = document.getElementById('calendarPicker');
-    const btn = container.querySelector('.cal-btn-confirm');
-    if (btn) { btn.textContent = '✓ 已选定'; btn.style.background = 'var(--c-green)'; }
+    document.getElementById('calendarPicker').style.display = 'none';
+    document.getElementById('dateFieldLabel').textContent = '提醒日期';
+    document.getElementById('dateValStr').textContent = calSelectedDate;
+    document.getElementById('selectedDateDisplay').style.display = 'flex';
+}
+
+function reopenCalendar() {
+    document.getElementById('calendarPicker').style.display = 'block';
+    document.getElementById('selectedDateDisplay').style.display = 'none';
+    document.getElementById('dateFieldLabel').textContent = '选择日期';
+    renderCalendar();
 }
 
 // ─── Create / Update Task ───
