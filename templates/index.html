@@ -650,7 +650,7 @@ input, select, button, textarea { font-family: inherit; }
             </div>
 
             <div class="footer-info">
-                Life Reminder v3.1.1<br>
+                Life Reminder v3.1.2<br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -992,7 +992,6 @@ function paintHome() {
                 // 智能切换：只要用户动手拖拽，自动切换到手动模式并静默保存
                 if (localStorage.getItem('taskSortMode') !== 'manual') {
                     localStorage.setItem('taskSortMode', 'manual');
-                    document.getElementById('taskSortMode').value = 'manual';
                     showToast('已切换至自定义排序', 'arrow-pointer', 'var(--c-teal)');
                 } else {
                     showToast('排序已保存', 'check', 'var(--c-purple)');
