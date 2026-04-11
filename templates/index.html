@@ -470,9 +470,20 @@ input, select, button, textarea { font-family: inherit; }
 .tp-cols { display: flex; gap: 10px; margin-bottom: 12px; }
 .tp-list {
     flex: 1; height: 140px; background: var(--c-surface2); border: none; border-radius: 12px;
-    color: var(--c-text); outline: none; padding: 4px; font-size: 1rem;
+    color: var(--c-text); outline: none; padding: 4px; font-size: 1.15rem; line-height: 1.5;
     scrollbar-width: none; font-family: 'JetBrains Mono', monospace; text-align: center;
+    -webkit-appearance: none; appearance: none;
 }
+.toast-msg {
+    position: fixed; top: 40px; left: 50%; transform: translate(-50%, -20px);
+    background: rgba(40,40,40,0.9); backdrop-filter: blur(10px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    padding: 12px 24px; border-radius: 30px; font-weight: 600; font-size: 0.95rem;
+    color: #fff; z-index: 10000; opacity: 0; pointer-events: none;
+    transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex; align-items: center; gap: 8px;
+}
+.toast-msg.show { opacity: 1; transform: translate(-50%, 0); }
 .tp-list::-webkit-scrollbar { display: none; }
 .tp-list option {
     padding: 8px; border-radius: 8px; margin-bottom: 2px;
@@ -615,7 +626,7 @@ input, select, button, textarea { font-family: inherit; }
     <div class="sheet-panel" id="sheet-add" onclick="event.stopPropagation()">
         <div class="sheet-header">
             <div class="sheet-title" id="addSheetTitle">新建任务</div>
-            <button class="sheet-close" onclick="closeSheet()"><i class="fas fa-xmark"></i></button>
+            <button class="sheet-close" onclick="closeSheet(true)"><i class="fas fa-xmark"></i></button>
         </div>
         <div class="field">
             <label>任务名称</label>
@@ -677,7 +688,7 @@ input, select, button, textarea { font-family: inherit; }
     <div class="sheet-panel" id="sheet-wecom" onclick="event.stopPropagation()">
         <div class="sheet-header">
             <div class="sheet-title">企业微信推送配置</div>
-            <button class="sheet-close" onclick="closeSheet()"><i class="fas fa-xmark"></i></button>
+            <button class="sheet-close" onclick="closeSheet(true)"><i class="fas fa-xmark"></i></button>
         </div>
         <div class="field">
             <label>企业微信 Webhook</label>
@@ -701,7 +712,7 @@ input, select, button, textarea { font-family: inherit; }
     <div class="sheet-panel" id="sheet-smsvoice" onclick="event.stopPropagation()">
         <div class="sheet-header">
             <div class="sheet-title">短信 / 电话配置</div>
-            <button class="sheet-close" onclick="closeSheet()"><i class="fas fa-xmark"></i></button>
+            <button class="sheet-close" onclick="closeSheet(true)"><i class="fas fa-xmark"></i></button>
         </div>
         <div class="field">
             <label>接收手机号</label>
@@ -732,7 +743,7 @@ input, select, button, textarea { font-family: inherit; }
     <div class="sheet-panel" id="sheet-dinglark" onclick="event.stopPropagation()">
         <div class="sheet-header">
             <div class="sheet-title">钉钉/飞书推送配置</div>
-            <button class="sheet-close" onclick="closeSheet()"><i class="fas fa-xmark"></i></button>
+            <button class="sheet-close" onclick="closeSheet(true)"><i class="fas fa-xmark"></i></button>
         </div>
         <div class="field">
             <label>钉钉 Webhook</label>
@@ -996,7 +1007,7 @@ function hideLog(id) {
 function reuseLog(title) {
     document.getElementById('f_editId').value = '';
     document.getElementById('f_title').value = title;
-    document.getElementById('addSheetTitle').textContent = '新建任务';
+    document.getElementById('addSheetTitle').textContent = '复用任务';
     document.querySelector('#sheet-add .btn-submit').textContent = '创建提醒';
     openSheet('add');
 }
@@ -1167,6 +1178,7 @@ function selectCalDay(dateStr) {
 function cancelCalendar() {
     calSelectedDate = null;
     document.getElementById('f_date').value = '';
+    showToast('已取消', 'times-circle', '#ff9f0a');
     // Switch back to daily
     document.querySelectorAll('#repeatMode .chip').forEach(c => c.classList.remove('active'));
     document.querySelector('#repeatMode .chip[data-val="daily"]').classList.add('active');
@@ -1228,6 +1240,7 @@ async function createTask() {
     document.getElementById('f_editId').value = '';
     closeSheet();
     await sync();
+    showToast('保存成功');
     // 需求6: 创建后跳转到首页
     goTo('home', document.querySelector('.dock-btn'));
 }
@@ -1248,6 +1261,7 @@ async function saveWebhooks() {
         })
     });
     closeSheet(); sync();
+    showToast('配置已保存');
 }
 
 function toggleDark() {
@@ -1268,6 +1282,19 @@ function goTo(id, el) {
 }
 
 // ─── Sheets ───
+let toastTmr;
+function showToast(msg, icon='check-circle', color='#30d158') {
+    let t = document.getElementById('globalToast');
+    if(!t) {
+        t = document.createElement('div'); t.id = 'globalToast'; t.className = 'toast-msg';
+        document.body.appendChild(t);
+    }
+    t.innerHTML = `<i class="fas fa-${icon}" style="color:${color}"></i> ${msg}`;
+    t.classList.add('show');
+    clearTimeout(toastTmr);
+    toastTmr = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
 function openSheet(id) {
     // Reset add sheet to "create" mode when opening fresh
     if (id === 'add' && !document.getElementById('f_editId').value) {
