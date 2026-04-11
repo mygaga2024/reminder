@@ -602,7 +602,7 @@ input, select, button, textarea { font-family: inherit; }
             </div>
 
             <div class="footer-info">
-                Life Reminder v3.0.2<br>
+                Life Reminder v3.0.4<br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -1007,9 +1007,9 @@ function hideLog(id) {
 function reuseLog(title) {
     document.getElementById('f_editId').value = '';
     document.getElementById('f_title').value = title;
+    openSheet('add');
     document.getElementById('addSheetTitle').textContent = '复用任务';
     document.querySelector('#sheet-add .btn-submit').textContent = '创建提醒';
-    openSheet('add');
 }
 async function deleteLog(id) {
     if (!confirm('确认删除该记录？')) return;
