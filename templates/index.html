@@ -7,6 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <style>
 /* ═══════════════════════════════════════════
    Design System — Tokens
@@ -193,9 +194,9 @@ input, select, button, textarea { font-family: inherit; }
 .task.pri-mid::before  { background: var(--c-orange); }
 .task.pri-low::before  { background: var(--c-green); }
 .task:active { transform: scale(0.98); background: var(--c-surface2); }
-.task.done { opacity: 0.4; }
+.task.done { opacity: 0.4; overflow: visible; }
 .task.done .task-title { text-decoration: line-through; }
-.task.dragging { opacity: 0.5; border-style: dashed; }
+.task.dragging { opacity: 0.8; transform: scale(1.02); box-shadow: 0 10px 20px rgba(0,0,0,0.2); z-index: 100; border: 1px solid var(--c-blue); background: var(--c-surface2); }
 
 .task-body { flex: 1; min-width: 0; }
 .task-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -538,7 +539,15 @@ input, select, button, textarea { font-family: inherit; }
 
             <div class="section-head">
                 <div class="section-title">任务列表</div>
-                <div class="section-count" id="totalCount">共 0 项</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <select id="taskSortMode" onchange="changeTaskSort()" style="background:transparent; border:none; font-size:0.75rem; color:var(--c-text3); font-weight:600; outline:none; text-align:right;">
+                        <option value="time">按时间</option>
+                        <option value="prio">按优先级</option>
+                        <option value="created">按创建顺序</option>
+                        <option value="manual">任意拖拽排序</option>
+                    </select>
+                    <div class="section-count" id="totalCount">共 0 项</div>
+                </div>
             </div>
             <div id="taskContainer"></div>
         </div>
@@ -844,17 +853,36 @@ function paintHome() {
         return rep;
     }
 
+    const sortMode = localStorage.getItem('taskSortMode') || 'time';
     const sorted = all.slice().sort((a,b) => {
         if (a.status === 'completed' && b.status !== 'completed') return 1;
         if (a.status !== 'completed' && b.status === 'completed') return -1;
+        if (sortMode === 'time') return a.time.localeCompare(b.time);
+        if (sortMode === 'created') return (b.created_at || '').localeCompare(a.created_at || '');
+        if (sortMode === 'prio') {
+            const pm = { 'high': 3, 'mid': 2, 'low': 1 };
+            const diff = (pm[b.priority] || 1) - (pm[a.priority] || 1);
+            if (diff !== 0) return diff;
+            return a.time.localeCompare(b.time);
+        }
+        if (sortMode === 'manual') {
+            const manualOrder = JSON.parse(localStorage.getItem('taskManualOrder') || '[]');
+            const idxA = manualOrder.indexOf(a.id);
+            const idxB = manualOrder.indexOf(b.id);
+            if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+            if (idxA !== -1) return -1;
+            if (idxB !== -1) return 1;
+            return a.time.localeCompare(b.time);
+        }
         return a.time.localeCompare(b.time);
     });
 
+    document.getElementById('taskSortMode').value = sortMode;
+
     container.innerHTML = sorted.map((r, idx) => `
         <div class="task pri-${r.priority || 'low'} ${r.status==='completed'?'done':''}"
-             draggable="true" data-id="${r.id}" data-idx="${idx}"
-             ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dropTask(event)" ondragend="dragEnd(event)">
-            <div class="drag-handle"><i class="fas fa-grip-vertical"></i></div>
+             id="task-${r.id}" data-id="${r.id}" data-idx="${idx}">
+            <div class="drag-handle" style="touch-action:none"><i class="fas fa-grip-vertical"></i></div>
             <div class="task-body">
                 <div class="task-title">${r.title}</div>
                 <div class="task-sub">
@@ -876,27 +904,46 @@ function paintHome() {
     `).join('');
 }
 
-// ─── Drag & Drop Sort ───
-let dragSrcId = null;
-function dragStart(e) {
-    dragSrcId = e.currentTarget.dataset.id;
-    e.currentTarget.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-}
-function dragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
-function dropTask(e) {
-    e.preventDefault();
-    const targetId = e.currentTarget.dataset.id;
-    if (dragSrcId && targetId && dragSrcId !== targetId) {
-        const arr = S.db.reminders;
-        const srcIdx = arr.findIndex(r => r.id === dragSrcId);
-        const tgtIdx = arr.findIndex(r => r.id === targetId);
-        if (srcIdx > -1 && tgtIdx > -1) {
-            const [item] = arr.splice(srcIdx, 1);
-            arr.splice(tgtIdx, 0, item);
-            paintHome(); // local reorder (visual only — order persists via next save)
-        }
+    if (window.newTaskId) {
+        setTimeout(() => {
+            const el = document.getElementById('task-' + window.newTaskId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.style.transition = 'all 0.5s';
+                el.style.background = 'var(--c-surface2)';
+                el.style.transform = 'scale(1.02)';
+                setTimeout(() => { el.style.background = ''; el.style.transform = ''; }, 1200);
+            }
+            window.newTaskId = undefined;
+        }, 150);
     }
+    
+    // Setup Sortable
+    if (window.taskSortableInst) window.taskSortableInst.destroy();
+    if (sortMode === 'manual' && typeof Sortable !== 'undefined') {
+        window.taskSortableInst = new Sortable(container, {
+            animation: 200,
+            delay: 200,
+            delayOnTouchOnly: true,
+            handle: '.task', // Allow tapping anywhere to drag
+            ghostClass: 'dragging',
+            onEnd: function () {
+                const order = Array.from(container.children).map(c => c.dataset.id).filter(id => id);
+                localStorage.setItem('taskManualOrder', JSON.stringify(order));
+                showToast('排序已保存', 'check', 'var(--c-purple)');
+            }
+        });
+    }
+}
+
+function changeTaskSort() {
+    const val = document.getElementById('taskSortMode').value;
+    localStorage.setItem('taskSortMode', val);
+    if (val === 'manual' && !localStorage.getItem('taskManualOrder')) {
+        const order = Array.from(document.getElementById('taskContainer').children).map(c => c.dataset.id).filter(id => id);
+        localStorage.setItem('taskManualOrder', JSON.stringify(order));
+    }
+    paintHome();
 }
 function dragEnd(e) { e.currentTarget.classList.remove('dragging'); dragSrcId = null; }
 
@@ -1248,13 +1295,16 @@ async function createTask() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title, time: finalTime, priority: prio, repeat })
         });
+        window.newTaskId = editId;
     } else {
         // Create new
-        await fetch('/api/reminders', {
+        const res = await fetch('/api/reminders', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title, time: finalTime, priority: prio, repeat, category: 'work' })
         });
+        const created = await res.json();
+        window.newTaskId = created.id;
     }
 
     // Reset form
