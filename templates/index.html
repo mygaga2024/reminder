@@ -251,20 +251,36 @@ input, select, button, textarea { font-family: inherit; }
 }
 .log-icon.triggered { background: rgba(10,132,255,0.12); color: var(--c-blue); }
 
-/* Sort Chips Container */
-.sort-scroll {
-    display: flex; gap: 8px; overflow-x: auto; padding: 4px; margin-bottom: 8px;
-    scrollbar-width: none; -webkit-overflow-scrolling: touch;
-}
-.sort-scroll::-webkit-scrollbar { display: none; }
-.sort-chip {
-    flex-shrink: 0; background: var(--c-surface); border: 1px solid var(--c-border);
+/* Custom Premium Dropdown */
+.sort-container { position: relative; }
+.sort-trigger {
+    background: var(--c-surface2); border: 1px solid var(--c-border);
     padding: 6px 12px; border-radius: 10px; font-size: 0.72rem; font-weight: 700;
-    color: var(--c-text3); display: flex; align-items: center; gap: 4px; transition: var(--transition);
+    color: var(--c-text2); display: flex; align-items: center; gap: 6px; 
+    cursor: pointer; transition: var(--transition); outline: none;
 }
-.sort-chip.active { background: var(--c-surface2); border-color: var(--c-blue); color: var(--c-blue); }
-.sort-chip i { font-size: 0.6rem; opacity: 0.6; }
-.sort-chip.active i { opacity: 1; }
+.sort-trigger:active { transform: scale(0.95); }
+.sort-trigger.active { border-color: var(--c-blue); color: var(--c-blue); }
+
+.sort-menu {
+    position: absolute; top: calc(100% + 8px); right: 0; width: 160px;
+    background: rgba(28, 28, 30, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--c-border); border-radius: 14px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    z-index: 1000; opacity: 0; transform: translateY(-10px) scale(0.95);
+    pointer-events: none; transition: 0.25s cubic-bezier(0.2, 1, 0.2, 1);
+}
+.sort-menu.show { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+
+.sort-item {
+    padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.8rem; font-weight: 600; color: var(--c-text2); cursor: pointer;
+    transition: var(--transition); border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.sort-item:last-child { border-bottom: none; }
+.sort-item:active { background: rgba(255,255,255,0.05); }
+.sort-item.active { color: var(--c-blue); }
+.sort-item i { font-size: 0.7rem; }
 .log-icon.completed { background: rgba(48,209,88,0.12); color: var(--c-green); }
 .log-body { flex: 1; min-width: 0; }
 .log-body h4 { font-weight: 600; font-size: 0.85rem; margin-bottom: 2px; }
@@ -560,13 +576,17 @@ input, select, button, textarea { font-family: inherit; }
 
             <div class="section-head">
                 <div class="section-title">任务列表</div>
-                <div class="section-count" id="totalCount">共 0 项</div>
-            </div>
-            <div class="sort-scroll" id="sortGroup">
-                <div class="sort-chip" data-mode="time" onclick="applySort('time')"><span>按任务时间</span><i class="fas fa-arrows-up-down"></i></div>
-                <div class="sort-chip" data-mode="prio" onclick="applySort('prio')"><span>按优先级</span><i class="fas fa-arrows-up-down"></i></div>
-                <div class="sort-chip" data-mode="created" onclick="applySort('created')"><span>按创建时间</span><i class="fas fa-arrows-up-down"></i></div>
-                <div class="sort-chip" data-mode="manual" onclick="applySort('manual')"><span>自定义排序</span><i class="fas fa-fingerprint"></i></div>
+                <div class="sort-container">
+                    <button class="sort-trigger" id="sortTrigger" onclick="toggleSortMenu(event)">
+                        <span id="sortLabel">按任务时间</span><i id="sortIcon" class="fas fa-arrow-down-short-wide"></i>
+                    </button>
+                    <div class="sort-menu" id="sortMenu">
+                        <div class="sort-item" data-mode="time" onclick="applySort('time')"><span>按任务时间</span><i class="fas fa-arrows-up-down"></i></div>
+                        <div class="sort-item" data-mode="prio" onclick="applySort('prio')"><span>按优先级</span><i class="fas fa-arrows-up-down"></i></div>
+                        <div class="sort-item" data-mode="created" onclick="applySort('created')"><span>按创建时间</span><i class="fas fa-arrows-up-down"></i></div>
+                        <div class="sort-item" data-mode="manual" onclick="applySort('manual')"><span>自定义排序</span><i class="fas fa-fingerprint"></i></div>
+                    </div>
+                </div>
             </div>
             <div id="taskContainer"></div>
         </div>
@@ -630,7 +650,7 @@ input, select, button, textarea { font-family: inherit; }
             </div>
 
             <div class="footer-info">
-                Life Reminder v3.1.0<br>
+                Life Reminder v3.1.1<br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -876,16 +896,19 @@ function paintHome() {
     const sortRev = localStorage.getItem('taskSortRev') === 'true';
     
     // Update Control UI
-    document.querySelectorAll('.sort-chip').forEach(c => {
-        const isActive = c.dataset.mode === sortMode;
-        c.classList.toggle('active', isActive);
+    const modeNameMap = { time: '按任务时间', prio: '按优先级', created: '按创建时间', manual: '自定义排序' };
+    document.getElementById('sortLabel').textContent = modeNameMap[sortMode];
+    document.getElementById('sortIcon').className = sortMode === 'manual' ? 'fas fa-fingerprint' : (sortRev ? 'fas fa-arrow-up-wide-short' : 'fas fa-arrow-down-short-wide');
+
+    document.querySelectorAll('.sort-item').forEach(item => {
+        const isActive = item.dataset.mode === sortMode;
+        item.classList.toggle('active', isActive);
+        const icon = item.querySelector('i');
         if (isActive) {
-            const icon = c.querySelector('i');
             if (sortMode === 'manual') icon.className = 'fas fa-fingerprint';
             else icon.className = sortRev ? 'fas fa-arrow-up-wide-short' : 'fas fa-arrow-down-short-wide';
         } else {
-            const icon = c.querySelector('i');
-            if (c.dataset.mode === 'manual') icon.className = 'fas fa-fingerprint';
+            if (item.dataset.mode === 'manual') icon.className = 'fas fa-fingerprint';
             else icon.className = 'fas fa-arrows-up-down';
         }
     });
@@ -985,16 +1008,26 @@ function changeTaskSort() {
     // Legacy support for dropdown is gone, using cycle via toggleSortCycle
 }
 
+function toggleSortMenu(e) {
+    e.stopPropagation();
+    document.getElementById('sortMenu').classList.toggle('show');
+}
+
+// Global click to close menu
+document.addEventListener('click', () => {
+    const menu = document.getElementById('sortMenu');
+    if (menu) menu.classList.remove('show');
+});
+
 function applySort(mode) {
     let current = localStorage.getItem('taskSortMode') || 'time';
     let rev = localStorage.getItem('taskSortRev') === 'true';
 
     if (current === mode) {
-        // Toggle direction
         localStorage.setItem('taskSortRev', (!rev).toString());
     } else {
         localStorage.setItem('taskSortMode', mode);
-        localStorage.setItem('taskSortRev', 'false'); // Reset to asc for new mode
+        localStorage.setItem('taskSortRev', 'false');
     }
 
     if (mode === 'manual' && !localStorage.getItem('taskManualOrder')) {
@@ -1002,10 +1035,6 @@ function applySort(mode) {
         localStorage.setItem('taskManualOrder', JSON.stringify(order));
     }
     paintHome();
-}
-
-function toggleSortCycle() {
-    // Replaced by applySort(mode)
 }
 function dragEnd(e) { e.currentTarget.classList.remove('dragging'); dragSrcId = null; }
 
