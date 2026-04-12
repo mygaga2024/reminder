@@ -6,6 +6,7 @@ import json
 import requests
 import re
 import uuid
+import zoneinfo
 from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -42,9 +43,11 @@ logger.addHandler(stream_handler)
 logger.setLevel(logging.INFO)
 
 # 环境变量配置
+VERSION = "3.2.1"
 DATA_DIR = os.getenv("DATA_DIR", "/app/data")
 APP_PORT = int(os.getenv("APP_PORT", 5000))
 TZ = os.getenv("TZ", "Asia/Shanghai")
+TZ_ENV = zoneinfo.ZoneInfo(TZ)
 
 # 确保数据目录存在
 logger.info(f"数据存储目录: {DATA_DIR}")
@@ -229,7 +232,11 @@ def update_scheduler():
                 
                 trigger = None
                 if re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}', t_str):
-                    trigger = DateTrigger(run_date=t_str)
+                    target_dt = datetime.datetime.strptime(t_str, '%Y-%m-%d %H:%M')
+                    target_dt = TZ_ENV.localize(target_dt) if hasattr(TZ_ENV, 'localize') else target_dt
+                    if target_dt <= datetime.datetime.now(TZ_ENV):
+                        target_dt += datetime.timedelta(days=1)
+                    trigger = DateTrigger(run_date=target_dt)
                 elif re.match(r'^\d{1,2}:\d{2}', t_str):
                     h, m = t_str.split(':')[:2]
                     if rep == "daily":
@@ -241,7 +248,7 @@ def update_scheduler():
                         trigger = CronTrigger(hour=h, minute=m)
                     else:
                         target_datetime = datetime.datetime.combine(datetime.date.today(), datetime.time(int(h), int(m)))
-                        if target_datetime <= datetime.datetime.now():
+                        if target_datetime <= datetime.datetime.now(TZ_ENV):
                             target_datetime += datetime.timedelta(days=1)
                         trigger = DateTrigger(run_date=target_datetime)
                 
@@ -277,7 +284,7 @@ def home():
 def get_state():
     """获取系统状态"""
     try:
-        return jsonify({"db": db, "logs": logs[-100:], "syslogs": log_handler.logs[::-1]})
+        return jsonify({"db": db, "logs": logs[-100:], "syslogs": log_handler.logs[::-1], "version": VERSION})
     except Exception as e:
         logger.error(f"获取状态失败: {e}")
         return jsonify({"error": str(e)}), 500
