@@ -12,6 +12,13 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 
+try:
+    import chinese_calendar
+    CHINESE_CALENDAR_AVAILABLE = True
+except ImportError:
+    CHINESE_CALENDAR_AVAILABLE = False
+    chinese_calendar = None
+
 # --- Logging setup ---
 class ListHandler(logging.Handler):
     def __init__(self):
@@ -25,11 +32,13 @@ class ListHandler(logging.Handler):
         except Exception:
             self.handleError(record)
 
-# 修复关键点：%(message)s 才是正确的占位符
 log_handler = ListHandler()
 log_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logger = logging.getLogger()
 logger.addHandler(log_handler)
+logger.addHandler(stream_handler)
 logger.setLevel(logging.INFO)
 
 # 环境变量配置
@@ -76,10 +85,20 @@ def load_json(filepath, default):
     return default
 
 def save_json(filepath, data):
-    """保存JSON文件，添加详细的错误处理"""
+    """保存JSON文件，使用原子写入防止数据损坏"""
     try:
-        with open(filepath, "w", encoding="utf-8") as f:
+        dir_path = os.path.dirname(filepath)
+        if dir_path and not os.path.exists(dir_path):
+            os.makedirs(dir_path, exist_ok=True)
+            logger.info(f"创建目录: {dir_path}")
+        
+        temp_file = filepath + ".tmp"
+        with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        
+        os.replace(temp_file, filepath)
         logger.info(f"成功保存文件: {filepath}")
     except Exception as e:
         logger.error(f"保存文件失败 ({filepath}): {e}")
@@ -95,12 +114,33 @@ db = load_json(CONFIG_FILE, {
 })
 logs = load_json(LOGS_FILE, [])
 
+logger.info(f"=== 系统启动诊断 ===")
+logger.info(f"数据存储目录: {DATA_DIR}")
+logger.info(f"配置文件路径: {CONFIG_FILE}")
+logger.info(f"日志文件路径: {LOGS_FILE}")
+logger.info(f"配置文件存在: {os.path.exists(CONFIG_FILE)}")
 logger.info(f"加载提醒数量: {len(db['reminders'])}")
 logger.info(f"加载日志数量: {len(logs)}")
+if os.path.exists(CONFIG_FILE):
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            file_content = json.load(f)
+            logger.info(f"配置文件中提醒数量: {len(file_content.get('reminders', []))}")
+    except Exception as e:
+        logger.error(f"读取配置文件内容失败: {e}")
+logger.info(f"=====================")
 
 def notify_engine(reminder):
     """通知引擎，添加详细的错误处理"""
     try:
+        rep = reminder.get("repeat", "none")
+        
+        if rep == "workday":
+            today = datetime.date.today()
+            if not is_china_workday(today):
+                logger.info(f"工作日任务跳过（非法定工作日）: {reminder.get('title')} - {today}")
+                return
+        
         s = db["settings"]
         title = reminder.get("title", "未命名提醒")
         now_str = datetime.datetime.now().strftime('%H:%M:%S')
@@ -128,11 +168,11 @@ def notify_engine(reminder):
 
         # 记录日志
         log_entry = {
-            "id": str(uuid.uuid4()), 
-            "reminder_id": reminder.get("id", "unknown"), 
+            "id": str(uuid.uuid4()),
+            "reminder_id": reminder.get("id", "unknown"),
             "title": title,
-            "triggered_at": datetime.datetime.now().isoformat(), 
-            "completed_at": None, 
+            "triggered_at": datetime.datetime.now().isoformat(),
+            "completed_at": None,
             "status": "triggered"
         }
         logs.append(log_entry)
@@ -141,11 +181,39 @@ def notify_engine(reminder):
     except Exception as e:
         logger.error(f"通知引擎错误: {e}")
 
+def is_china_workday(check_date=None):
+    """检查指定日期是否为工作日（考虑中国法定节假日）"""
+    if check_date is None:
+        check_date = datetime.date.today()
+    
+    if not CHINESE_CALENDAR_AVAILABLE:
+        return check_date.weekday() < 5
+    
+    return chinese_calendar.is_workday(check_date)
+
+def get_next_workday(from_date=None):
+    """获取下一个工作日"""
+    if from_date is None:
+        from_date = datetime.date.today()
+    
+    if not CHINESE_CALENDAR_AVAILABLE:
+        current = from_date
+        while current.weekday() >= 5:
+            current += datetime.timedelta(days=1)
+        return current
+    
+    return chinese_calendar.get_next_workday(from_date)
+
 def update_scheduler():
     """更新调度器，添加详细的错误处理"""
     try:
         scheduler.remove_all_jobs()
         logger.info("清空现有调度任务")
+        
+        if CHINESE_CALENDAR_AVAILABLE:
+            logger.info("中国法定节假日支持已启用")
+        else:
+            logger.info("中国法定节假日支持未启用，使用简单工作日判断")
         
         for r in db["reminders"]:
             if r.get("status") == "completed":
@@ -169,12 +237,17 @@ def update_scheduler():
                     elif rep.startswith("weekly:"):
                         days = rep.split(":")[1]
                         trigger = CronTrigger(day_of_week=days, hour=h, minute=m)
+                    elif rep == "workday":
+                        trigger = CronTrigger(hour=h, minute=m)
                     else:
-                        trigger = DateTrigger(run_date=f"{datetime.date.today()} {t_str}")
+                        target_datetime = datetime.datetime.combine(datetime.date.today(), datetime.time(int(h), int(m)))
+                        if target_datetime <= datetime.datetime.now():
+                            target_datetime += datetime.timedelta(days=1)
+                        trigger = DateTrigger(run_date=target_datetime)
                 
                 if trigger:
                     scheduler.add_job(notify_engine, trigger, args=[r], id=r.get('id'))
-                    logger.info(f"添加调度任务: {r.get('title')} - {t_str}")
+                    logger.info(f"添加调度任务: {r.get('title')} - {t_str} (重复: {rep})")
                 else:
                     logger.warning(f"无法创建触发器: {r.get('title')} - {t_str}")
             except Exception as e:
@@ -277,7 +350,7 @@ def mod_settings():
 if __name__ == "__main__":
     try:
         from waitress import serve
-        logger.info(f"Life Reminder Engine v3.0.0 启动中...")
+        logger.info(f"Life Reminder Engine v3.2.1 启动中...")
         logger.info(f"服务端口: {APP_PORT}")
         logger.info(f"时区: {TZ}")
         

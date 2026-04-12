@@ -45,7 +45,7 @@ docker compose up -d --build
 ## 📖 使用指南
 1. 访问 `http://localhost:5000` 进入管理面板。
 2. 在 **设置** 中配置你的 Webhook 机器人或邮箱。
-3. 在 **主页** 点击右上角 `+` 号，即可创建你的第一个智能提醒。
+3. 在 **主页** 点击底部导航栏中间的 `+` 按钮，即可创建你的第一个智能提醒。
 
 ---
 *Created by [mygaga2024](https://github.com/mygaga2024)*
