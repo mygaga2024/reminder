@@ -12,6 +12,13 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 
+try:
+    import chinese_calendar
+    CHINESE_CALENDAR_AVAILABLE = True
+except ImportError:
+    CHINESE_CALENDAR_AVAILABLE = False
+    chinese_calendar = None
+
 # --- Logging setup ---
 class ListHandler(logging.Handler):
     def __init__(self):
@@ -124,6 +131,14 @@ logger.info(f"=====================")
 def notify_engine(reminder):
     """通知引擎，添加详细的错误处理"""
     try:
+        rep = reminder.get("repeat", "none")
+        
+        if rep == "workday":
+            today = datetime.date.today()
+            if not is_china_workday(today):
+                logger.info(f"工作日任务跳过（非法定工作日）: {reminder.get('title')} - {today}")
+                return
+        
         s = db["settings"]
         title = reminder.get("title", "未命名提醒")
         now_str = datetime.datetime.now().strftime('%H:%M:%S')
@@ -151,11 +166,11 @@ def notify_engine(reminder):
 
         # 记录日志
         log_entry = {
-            "id": str(uuid.uuid4()), 
-            "reminder_id": reminder.get("id", "unknown"), 
+            "id": str(uuid.uuid4()),
+            "reminder_id": reminder.get("id", "unknown"),
             "title": title,
-            "triggered_at": datetime.datetime.now().isoformat(), 
-            "completed_at": None, 
+            "triggered_at": datetime.datetime.now().isoformat(),
+            "completed_at": None,
             "status": "triggered"
         }
         logs.append(log_entry)
@@ -164,11 +179,39 @@ def notify_engine(reminder):
     except Exception as e:
         logger.error(f"通知引擎错误: {e}")
 
+def is_china_workday(check_date=None):
+    """检查指定日期是否为工作日（考虑中国法定节假日）"""
+    if check_date is None:
+        check_date = datetime.date.today()
+    
+    if not CHINESE_CALENDAR_AVAILABLE:
+        return check_date.weekday() < 5
+    
+    return chinese_calendar.is_workday(check_date)
+
+def get_next_workday(from_date=None):
+    """获取下一个工作日"""
+    if from_date is None:
+        from_date = datetime.date.today()
+    
+    if not CHINESE_CALENDAR_AVAILABLE:
+        current = from_date
+        while current.weekday() >= 5:
+            current += datetime.timedelta(days=1)
+        return current
+    
+    return chinese_calendar.get_next_workday(from_date)
+
 def update_scheduler():
     """更新调度器，添加详细的错误处理"""
     try:
         scheduler.remove_all_jobs()
         logger.info("清空现有调度任务")
+        
+        if CHINESE_CALENDAR_AVAILABLE:
+            logger.info("中国法定节假日支持已启用")
+        else:
+            logger.info("中国法定节假日支持未启用，使用简单工作日判断")
         
         for r in db["reminders"]:
             if r.get("status") == "completed":
@@ -193,7 +236,7 @@ def update_scheduler():
                         days = rep.split(":")[1]
                         trigger = CronTrigger(day_of_week=days, hour=h, minute=m)
                     elif rep == "workday":
-                        trigger = CronTrigger(day_of_week='mon,tue,wed,thu,fri', hour=h, minute=m)
+                        trigger = CronTrigger(hour=h, minute=m)
                     else:
                         target_datetime = datetime.datetime.combine(datetime.date.today(), datetime.time(int(h), int(m)))
                         if target_datetime <= datetime.datetime.now():
@@ -202,7 +245,7 @@ def update_scheduler():
                 
                 if trigger:
                     scheduler.add_job(notify_engine, trigger, args=[r], id=r.get('id'))
-                    logger.info(f"添加调度任务: {r.get('title')} - {t_str}")
+                    logger.info(f"添加调度任务: {r.get('title')} - {t_str} (重复: {rep})")
                 else:
                     logger.warning(f"无法创建触发器: {r.get('title')} - {t_str}")
             except Exception as e:
