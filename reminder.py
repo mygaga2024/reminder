@@ -76,10 +76,20 @@ def load_json(filepath, default):
     return default
 
 def save_json(filepath, data):
-    """保存JSON文件，添加详细的错误处理"""
+    """保存JSON文件，使用原子写入防止数据损坏"""
     try:
-        with open(filepath, "w", encoding="utf-8") as f:
+        dir_path = os.path.dirname(filepath)
+        if dir_path and not os.path.exists(dir_path):
+            os.makedirs(dir_path, exist_ok=True)
+            logger.info(f"创建目录: {dir_path}")
+        
+        temp_file = filepath + ".tmp"
+        with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        
+        os.replace(temp_file, filepath)
         logger.info(f"成功保存文件: {filepath}")
     except Exception as e:
         logger.error(f"保存文件失败 ({filepath}): {e}")
