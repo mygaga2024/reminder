@@ -350,7 +350,7 @@ def mod_settings():
 if __name__ == "__main__":
     try:
         from waitress import serve
-        logger.info(f"Life Reminder Engine v3.0.4 启动中...")
+        logger.info(f"Life Reminder Engine v3.2.1 启动中...")
         logger.info(f"服务端口: {APP_PORT}")
         logger.info(f"时区: {TZ}")
         
