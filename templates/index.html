@@ -668,10 +668,17 @@ input, select, button, textarea { font-family: inherit; }
                     </div>
                     <div class="set-right"><i class="fas fa-chevron-right"></i></div>
                 </div>
+                <div class="set-item" onclick="openAbout()">
+                    <div class="set-left">
+                        <div class="set-icon" style="background:rgba(10,132,255,0.12); color:var(--c-blue)"><i class="fas fa-info-circle"></i></div>
+                        <div class="set-label"><h4>关于</h4><p>查看版本历史与更新日志</p></div>
+                    </div>
+                    <div class="set-right"><i class="fas fa-chevron-right"></i></div>
+                </div>
             </div>
 
             <div class="footer-info">
-                Life Reminder v3.2.0<br>
+                Life Reminder v<span id="appVersion">3.2.1</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -874,6 +881,7 @@ async function sync() {
     try {
         const res = await fetch('/api/state');
         S = await res.json();
+        if (S.version) document.getElementById('appVersion').textContent = S.version;
         paintHome();
         paintData();
         paintLogs();
