@@ -42,6 +42,7 @@ logger.addHandler(stream_handler)
 logger.setLevel(logging.INFO)
 
 # 环境变量配置
+VERSION = "3.2.1"
 DATA_DIR = os.getenv("DATA_DIR", "/app/data")
 APP_PORT = int(os.getenv("APP_PORT", 5000))
 TZ = os.getenv("TZ", "Asia/Shanghai")
@@ -277,7 +278,7 @@ def home():
 def get_state():
     """获取系统状态"""
     try:
-        return jsonify({"db": db, "logs": logs[-100:], "syslogs": log_handler.logs[::-1]})
+        return jsonify({"db": db, "logs": logs[-100:], "syslogs": log_handler.logs[::-1], "version": VERSION})
     except Exception as e:
         logger.error(f"获取状态失败: {e}")
         return jsonify({"error": str(e)}), 500

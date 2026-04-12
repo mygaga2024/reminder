@@ -671,7 +671,7 @@ input, select, button, textarea { font-family: inherit; }
             </div>
 
             <div class="footer-info">
-                Life Reminder v3.2.1<br>
+                Life Reminder v<span id="appVersion">3.2.1</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -874,6 +874,7 @@ async function sync() {
     try {
         const res = await fetch('/api/state');
         S = await res.json();
+        if (S.version) document.getElementById('appVersion').textContent = S.version;
         paintHome();
         paintData();
         paintLogs();
