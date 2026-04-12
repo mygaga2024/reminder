@@ -192,8 +192,13 @@ def update_scheduler():
                     elif rep.startswith("weekly:"):
                         days = rep.split(":")[1]
                         trigger = CronTrigger(day_of_week=days, hour=h, minute=m)
+                    elif rep == "workday":
+                        trigger = CronTrigger(day_of_week='mon,tue,wed,thu,fri', hour=h, minute=m)
                     else:
-                        trigger = DateTrigger(run_date=f"{datetime.date.today()} {t_str}")
+                        target_datetime = datetime.datetime.combine(datetime.date.today(), datetime.time(int(h), int(m)))
+                        if target_datetime <= datetime.datetime.now():
+                            target_datetime += datetime.timedelta(days=1)
+                        trigger = DateTrigger(run_date=target_datetime)
                 
                 if trigger:
                     scheduler.add_job(notify_engine, trigger, args=[r], id=r.get('id'))
