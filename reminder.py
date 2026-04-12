@@ -105,8 +105,21 @@ db = load_json(CONFIG_FILE, {
 })
 logs = load_json(LOGS_FILE, [])
 
+logger.info(f"=== 系统启动诊断 ===")
+logger.info(f"数据存储目录: {DATA_DIR}")
+logger.info(f"配置文件路径: {CONFIG_FILE}")
+logger.info(f"日志文件路径: {LOGS_FILE}")
+logger.info(f"配置文件存在: {os.path.exists(CONFIG_FILE)}")
 logger.info(f"加载提醒数量: {len(db['reminders'])}")
 logger.info(f"加载日志数量: {len(logs)}")
+if os.path.exists(CONFIG_FILE):
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            file_content = json.load(f)
+            logger.info(f"配置文件中提醒数量: {len(file_content.get('reminders', []))}")
+    except Exception as e:
+        logger.error(f"读取配置文件内容失败: {e}")
+logger.info(f"=====================")
 
 def notify_engine(reminder):
     """通知引擎，添加详细的错误处理"""
