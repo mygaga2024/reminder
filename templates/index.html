@@ -124,10 +124,19 @@ input, select, button, textarea { font-family: inherit; }
     border-radius: var(--radius);
     padding: 16px;
     transition: var(--transition);
+    text-align: center;
+}
+.summary-card.wide {
+    padding: 20px 16px;
 }
 .summary-card:active { transform: scale(0.96); }
+.summary-icon {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+    color: var(--c-blue);
+}
 .summary-label { font-size: 0.7rem; color: var(--c-text3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-.summary-value { font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.summary-value { font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: 8px; justify-content: center; }
 
 .pulse-dot {
     width: 8px; height: 8px; border-radius: 50%; background: var(--c-green);
@@ -567,17 +576,15 @@ input, select, button, textarea { font-family: inherit; }
             </div>
 
             <div class="summary-row">
-                <div class="summary-card">
+                <div class="summary-card wide">
+                    <div class="summary-icon"><i class="fas fa-circle-nodes"></i></div>
                     <div class="summary-label">运行状态</div>
                     <div class="summary-value"><div class="pulse-dot"></div>在线</div>
                 </div>
-                <div class="summary-card">
+                <div class="summary-card wide">
+                    <div class="summary-icon"><i class="fas fa-list-check"></i></div>
                     <div class="summary-label">待办任务</div>
                     <div class="summary-value" id="pendingCount">0</div>
-                </div>
-                <div class="summary-card">
-                    <div class="summary-label">任务总数</div>
-                    <div class="summary-value" id="totalCount">共 0 项</div>
                 </div>
             </div>
 
@@ -629,6 +636,13 @@ input, select, button, textarea { font-family: inherit; }
                         <div class="set-label"><h4>深色模式</h4><p id="darkDesc">当前已开启</p></div>
                     </div>
                     <button class="toggle on" id="darkToggle"></button>
+                </div>
+                <div class="set-item" onclick="openAbout()">
+                    <div class="set-left">
+                        <div class="set-icon" style="background:rgba(10,132,255,0.12); color:var(--c-blue)"><i class="fas fa-info-circle"></i></div>
+                        <div class="set-label"><h4>关于</h4><p>查看版本历史与更新日志</p></div>
+                    </div>
+                    <div class="set-right"><i class="fas fa-chevron-right"></i></div>
                 </div>
             </div>
 
@@ -828,6 +842,15 @@ input, select, button, textarea { font-family: inherit; }
             2. 点击「群机器人」->「添加机器人」，选择「自定义机器人」<br>
             3. 配置名称和安全设置后，复制 Webhook 地址
         </div>
+    </div>
+
+    <!-- About Sheet -->
+    <div class="sheet-panel" id="sheet-about" onclick="event.stopPropagation()">
+        <div class="sheet-header">
+            <div class="sheet-title">关于</div>
+            <button class="sheet-close" onclick="closeSheet(true)"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="sheet-content" id="sheet-about-content"></div>
     </div>
 </div>
 
@@ -1493,6 +1516,48 @@ function openSheet(id) {
     }
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('sheet-' + id).style.display = 'block';
+}
+
+function openAbout() {
+    const aboutContent = `
+        <div style="padding: 20px; max-height: 70vh; overflow-y: auto;">
+            <h2 style="margin-bottom: 20px; text-align: center;">📋 版本历史</h2>
+            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 700; color: var(--c-blue);">v3.2.1</span>
+                    <span style="font-size: 0.75rem; color: var(--c-text3);">当前版本</span>
+                </div>
+                <ul style="margin: 10px 0 0 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
+                    <li>优化数据持久化，原子写入防止数据损坏</li>
+                    <li>增强错误处理和诊断日志</li>
+                    <li>优化首页UI，改进任务卡片布局</li>
+                </ul>
+            </div>
+            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+                <div style="font-weight: 700; color: var(--c-text1); margin-bottom: 8px;">v3.2.0</div>
+                <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
+                    <li>交付专业排序循环逻辑</li>
+                    <li>全功能农历语义日历</li>
+                    <li>智能日期语义化标签（今天/明天/后天）</li>
+                </ul>
+            </div>
+            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+                <div style="font-weight: 700; color: var(--c-text1); margin-bottom: 8px;">v3.0.0 - v3.0.3</div>
+                <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
+                    <li>全新UI界面设计</li>
+                    <li>支持企业微信、钉钉、飞书Webhook</li>
+                    <li>支持短信和电话通知</li>
+                    <li>任务排序和筛选功能</li>
+                </ul>
+            </div>
+            <p style="text-align: center; margin-top: 20px; font-size: 0.8rem; color: var(--c-text3);">
+                Made with ♥ by <a href="https://github.com/mygaga2024" style="color: var(--c-blue);">mygaga2024</a>
+            </p>
+        </div>
+    `;
+    document.getElementById('overlay').style.display = 'block';
+    document.getElementById('sheet-about').style.display = 'block';
+    document.getElementById('sheet-about').querySelector('.sheet-content').innerHTML = aboutContent;
 }
 function closeSheet() {
     document.getElementById('overlay').style.display = 'none';
