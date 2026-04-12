@@ -32,11 +32,13 @@ class ListHandler(logging.Handler):
         except Exception:
             self.handleError(record)
 
-# 修复关键点：%(message)s 才是正确的占位符
 log_handler = ListHandler()
 log_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logger = logging.getLogger()
 logger.addHandler(log_handler)
+logger.addHandler(stream_handler)
 logger.setLevel(logging.INFO)
 
 # 环境变量配置
@@ -348,7 +350,7 @@ def mod_settings():
 if __name__ == "__main__":
     try:
         from waitress import serve
-        logger.info(f"Life Reminder Engine v3.0.0 启动中...")
+        logger.info(f"Life Reminder Engine v3.0.4 启动中...")
         logger.info(f"服务端口: {APP_PORT}")
         logger.info(f"时区: {TZ}")
         
