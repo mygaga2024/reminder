@@ -183,7 +183,7 @@ def notify_engine(reminder):
         logger.info(f"提醒已触发: {title}")
 
         # 一次性任务触发后自动删除
-        if rep == "none":
+        if rep == "once":
             rid = reminder.get("id")
             db["reminders"] = [r for r in db["reminders"] if r.get("id") != rid]
             save_json(CONFIG_FILE, db)
