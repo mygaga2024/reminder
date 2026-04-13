@@ -376,22 +376,25 @@ input, select, button, textarea { font-family: inherit; }
    Bottom Dock
    ═══════════════════════════════════════════ */
 .dock {
-    position: absolute; bottom: 0; left: 0; right: 0;
-    height: 88px; padding-bottom: 16px;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: auto; min-height: 70px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
     background: linear-gradient(transparent, var(--c-bg) 30%);
     display: flex; align-items: flex-end; justify-content: center;
     z-index: 100;
 }
 .dock-inner {
     width: calc(100% - 40px);
-    height: 62px;
+    height: auto;
+    min-height: 56px;
+    padding: 8px 6px;
     background: rgba(28,28,30,0.75);
     backdrop-filter: blur(30px) saturate(180%);
     -webkit-backdrop-filter: blur(30px) saturate(180%);
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 20px;
     display: flex; align-items: center;
-    padding: 0 6px;
+    justify-content: space-around;
 }
 [data-theme="light"] .dock-inner {
     background: rgba(255,255,255,0.75);
@@ -399,13 +402,15 @@ input, select, button, textarea { font-family: inherit; }
 }
 
 .dock-btn {
-    flex: 1; height: 100%; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 3px;
+    flex: 1; height: 100%; min-height: 50px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px;
     color: var(--c-text3); cursor: pointer; border: none; background: none;
     transition: var(--transition);
+    -webkit-tap-highlight-color: transparent;
 }
 .dock-btn.active { color: var(--c-blue); }
-.dock-btn i { font-size: 1.2rem; }
+.dock-btn i { font-size: 1.25rem; }
 .dock-btn span { font-size: 0.6rem; font-weight: 600; }
 
 .dock-fab {
@@ -454,6 +459,48 @@ input, select, button, textarea { font-family: inherit; }
     cursor: pointer; font-size: 0.8rem; transition: var(--transition);
 }
 .sheet-close:active { transform: scale(0.9); }
+
+.template-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.template-card {
+    background: var(--c-surface2);
+    border-radius: 14px;
+    padding: 14px;
+    cursor: pointer;
+    transition: var(--transition);
+    border: 1px solid transparent;
+}
+.template-card:active {
+    transform: scale(0.97);
+    border-color: var(--c-blue);
+}
+.template-card-title {
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+    color: var(--c-text1);
+}
+.template-card-desc {
+    font-size: 0.72rem;
+    color: var(--c-text3);
+    line-height: 1.5;
+    margin-bottom: 8px;
+}
+.template-card-meta {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.template-tag {
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(10,132,255,0.12);
+    color: var(--c-blue);
+}
 
 .field { margin-bottom: 20px; }
 .field label { display: block; font-size: 0.72rem; font-weight: 700; color: var(--c-text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
@@ -659,6 +706,13 @@ input, select, button, textarea { font-family: inherit; }
                     </div>
                     <div class="set-right"><i class="fas fa-chevron-right"></i></div>
                 </div>
+                <div class="set-item" onclick="openTemplate()">
+                    <div class="set-left">
+                        <div class="set-icon" style="background:rgba(48,209,88,0.12); color:var(--c-green)"><i class="fas fa-bolt"></i></div>
+                        <div class="set-label"><h4>提醒模板</h4><p>快速创建常用提醒</p></div>
+                    </div>
+                    <div class="set-right"><i class="fas fa-chevron-right"></i></div>
+                </div>
                 <div class="set-item" onclick="openAbout()">
                     <div class="set-left">
                         <div class="set-icon" style="background:rgba(10,132,255,0.12); color:var(--c-blue)"><i class="fas fa-info-circle"></i></div>
@@ -839,6 +893,17 @@ input, select, button, textarea { font-family: inherit; }
             1. 打开飞书群聊，点击右上角设置图标进入「群设置」<br>
             2. 点击「群机器人」->「添加机器人」，选择「自定义机器人」<br>
             3. 配置名称和安全设置后，复制 Webhook 地址
+        </div>
+    </div>
+
+    <!-- Template Sheet -->
+    <div class="sheet-panel" id="sheet-template" onclick="event.stopPropagation()">
+        <div class="sheet-header">
+            <div class="sheet-title">提醒模板</div>
+            <button class="sheet-close" onclick="closeSheet(true)"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="sheet-content" style="padding:16px;">
+            <div class="template-grid" id="templateGrid"></div>
         </div>
     </div>
 
@@ -1515,6 +1580,52 @@ function openSheet(id) {
     }
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('sheet-' + id).style.display = 'block';
+}
+
+function openTemplate() {
+    const templates = [
+        { title: "每日工作汇报", desc: "每天下班前提醒整理今日工作进度", time: "18:00", repeat: "daily", priority: "medium" },
+        { title: "周会提醒", desc: "每周一早上提醒准备周会材料", time: "09:00", repeat: "weekly:mon", priority: "high" },
+        { title: "健康喝水", desc: "每2小时提醒喝一杯水", time: "09:00", repeat: "daily", priority: "low" },
+        { title: "眼保健操", desc: "工作间隙放松眼睛", time: "10:00", repeat: "daily", priority: "low" },
+        { title: "生日祝福", desc: "提醒给好友发送生日祝福", time: "09:00", repeat: "once", priority: "medium" },
+        { title: "健身打卡", desc: "下班后健身房锻炼", time: "19:00", repeat: "daily", priority: "medium" },
+        { title: "读书时间", desc: "每天睡前阅读30分钟", time: "22:00", repeat: "daily", priority: "low" },
+        { title: "项目里程碑", desc: "重要项目节点检查", time: "10:00", repeat: "once", priority: "high" }
+    ];
+    
+    const grid = document.getElementById('templateGrid');
+    grid.innerHTML = templates.map((t, i) => `
+        <div class="template-card" onclick="applyTemplate(${i})">
+            <div class="template-card-title">${t.title}</div>
+            <div class="template-card-desc">${t.desc}</div>
+            <div class="template-card-meta">
+                <span class="template-tag">${t.time}</span>
+                <span class="template-tag">${t.repeat === 'daily' ? '每天' : t.repeat === 'weekly:mon' ? '每周一' : '一次性'}</span>
+            </div>
+        </div>
+    `).join('');
+    
+    window.templateData = templates;
+    document.getElementById('overlay').style.display = 'block';
+    document.getElementById('sheet-template').style.display = 'block';
+}
+
+function applyTemplate(index) {
+    const t = window.templateData[index];
+    if (!t) return;
+    
+    document.getElementById('f_title').value = t.title;
+    document.getElementById('f_time').value = t.time;
+    document.getElementById('f_prio').value = t.priority;
+    
+    document.querySelectorAll('#repeatMode .chip').forEach(c => c.classList.remove('active'));
+    const repeatMap = { daily: 'daily', 'weekly:mon': 'weekly', once: 'once' };
+    const chip = document.querySelector(`#repeatMode .chip[data-val="${repeatMap[t.repeat] || 'daily'}"]`);
+    if (chip) chip.classList.add('active');
+    
+    closeSheet();
+    openSheet('add');
 }
 
 function openAbout() {
