@@ -185,8 +185,8 @@ def notify_engine(reminder):
         # 一次性任务触发后自动删除
         if rep == "none":
             rid = reminder.get("id")
-            reminders[:] = [r for r in reminders if r.get("id") != rid]
-            save_json(REMINDERS_FILE, reminders)
+            db["reminders"] = [r for r in db["reminders"] if r.get("id") != rid]
+            save_json(REMINDERS_FILE, db["reminders"])
             logger.info(f"一次性任务已自动删除: {title}")
     except Exception as e:
         logger.error(f"通知引擎错误: {e}")
