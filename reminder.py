@@ -7,11 +7,25 @@ import requests
 import re
 import uuid
 import zoneinfo
+import random
 from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
+
+TIPS_LIST = [
+    "💡 每天一苹果，医生远离我！",
+    "🌸 保持好心情，万事皆顺利！",
+    "☀️ 新的一天，新的开始！",
+    "🌈 今日份的小幸运正在派送中~",
+    "🍀 愿你今天事事顺心！",
+    "🌻 阳光正好，未来可期！",
+    "✨ 生活明朗，万物可爱！",
+    "🎯 今日目标：开心最重要！",
+    "🦋 偶尔放慢脚步，看看身边的美好~",
+    "📚 每天进步一点点，成就更好的自己！"
+]
 
 try:
     import chinese_calendar
@@ -43,7 +57,7 @@ logger.addHandler(stream_handler)
 logger.setLevel(logging.INFO)
 
 # 环境变量配置
-VERSION = "3.2.8"
+VERSION = "3.2.9"
 DATA_DIR = os.getenv("DATA_DIR", "/app/data")
 APP_PORT = int(os.getenv("APP_PORT", 5000))
 TZ = os.getenv("TZ", "Asia/Shanghai")
@@ -146,9 +160,21 @@ def notify_engine(reminder):
         
         s = db["settings"]
         title = reminder.get("title", "未命名提醒")
-        now_str = datetime.datetime.now().strftime('%H:%M:%S')
-        msg = f"⏰ 提醒: {title}\n触发时间: {now_str}"
+        now = datetime.datetime.now()
+        date_str = now.strftime('%Y年%m月%d日')
+        time_str = now.strftime('%H:%M')
         
+        tip = random.choice(TIPS_LIST)
+        
+        rep_label = {"once": "一次性", "daily": "每天", "weekly": "每周", "workday": "工作日"}.get(rep, "每天")
+        msg = f"""⏰ 您有一个提醒！
+
+📝 提醒内容：{title}
+📅 提醒时间：{date_str} {time_str}
+🔄 重复类型：{rep_label}
+
+{tip}"""
+
         # 发送通知
         for platform, url in s.get("webhooks", {}).items():
             if not url: continue
