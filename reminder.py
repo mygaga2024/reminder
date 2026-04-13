@@ -233,7 +233,7 @@ def update_scheduler():
                 trigger = None
                 if re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}', t_str):
                     target_dt = datetime.datetime.strptime(t_str, '%Y-%m-%d %H:%M')
-                    target_dt = TZ_ENV.localize(target_dt) if hasattr(TZ_ENV, 'localize') else target_dt
+                    target_dt = target_dt.replace(tzinfo=TZ_ENV)
                     if target_dt <= datetime.datetime.now(TZ_ENV):
                         target_dt += datetime.timedelta(days=1)
                     trigger = DateTrigger(run_date=target_dt)
