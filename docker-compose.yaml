@@ -1,13 +1,13 @@
 services:
   reminder:
-    # 使用最新版本
     image: ghcr.io/mygaga2024/reminder:latest
-    # 强制锁死容器名，防止生成 reminder-reminder-1
     container_name: reminder
     restart: always
-    environment:
-      - TZ=Asia/Shanghai
     ports:
-      - "5000:5000"
+      - "35015:5000"
     volumes:
       - ./data:/app/data
+    environment:
+      - TZ=Asia/Shanghai
+      - WX_APPID=wx25fb6f94762a07ea
+      - WX_SECRET=556f18c8c34b12001287fab0d8e6187d
