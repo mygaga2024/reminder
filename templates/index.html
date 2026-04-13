@@ -1620,9 +1620,21 @@ function applyTemplate(index) {
     document.getElementById('f_prio').value = t.priority;
     
     document.querySelectorAll('#repeatMode .chip').forEach(c => c.classList.remove('active'));
-    const repeatMap = { daily: 'daily', 'weekly:mon': 'weekly', once: 'once' };
-    const chip = document.querySelector(`#repeatMode .chip[data-val="${repeatMap[t.repeat] || 'daily'}"]`);
-    if (chip) chip.classList.add('active');
+    document.querySelectorAll('#weekdayPicker .chip').forEach(c => c.classList.remove('active'));
+    
+    if (t.repeat.startsWith('weekly:')) {
+        const chip = document.querySelector('#repeatMode .chip[data-val="weekly"]');
+        if (chip) chip.classList.add('active');
+        const days = t.repeat.split(':')[1].split(',');
+        days.forEach(day => {
+            const dayChip = document.querySelector(`#weekdayPicker .chip[data-val="${day}"]`);
+            if (dayChip) dayChip.classList.add('active');
+        });
+    } else {
+        const repeatMap = { daily: 'daily', once: 'once', workday: 'workday' };
+        const chip = document.querySelector(`#repeatMode .chip[data-val="${repeatMap[t.repeat] || 'daily'}"]`);
+        if (chip) chip.classList.add('active');
+    }
     
     closeSheet();
     openSheet('add');
