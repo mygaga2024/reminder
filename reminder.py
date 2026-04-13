@@ -127,7 +127,8 @@ db = load_json(CONFIG_FILE, {
         "language": "zh",
         "dark_mode": True,
         "webhooks": {"wecom": "", "dingtalk": "", "lark": ""}
-    }
+    },
+    "users": {}
 })
 logs = load_json(LOGS_FILE, [])
 
@@ -378,7 +379,7 @@ def mod_settings():
         update = request.json
         if not update:
             return jsonify({"error": "请求数据为空"}), 400
-        
+
         db["settings"].update(update)
         save_json(CONFIG_FILE, db)
         logger.info("更新设置")
@@ -387,17 +388,66 @@ def mod_settings():
         logger.error(f"修改设置失败: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/wxlogin', methods=['POST'])
+def wx_login():
+    """微信登录"""
+    try:
+        code = request.json.get('code')
+        if not code:
+            return jsonify({"error": "code 不能为空"}), 400
+
+        appid = os.getenv("WX_APPID", "")
+        secret = os.getenv("WX_SECRET", "")
+
+        if not appid or not secret:
+            return jsonify({"error": "未配置微信AppID和Secret，请检查环境变量"}), 400
+
+        import urllib.request
+        import urllib.parse
+        url = f"https://api.weixin.qq.com/sns/jscode2session?appid={appid}&secret={secret}&js_code={code}&grant_type=authorization_code"
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+
+        if "openid" in data:
+            wxid = data["openid"]
+            if "users" not in db:
+                db["users"] = {}
+            if wxid not in db["users"]:
+                db["users"][wxid] = {
+                    "openid": wxid,
+                    "created_at": datetime.datetime.now().isoformat()
+                }
+            save_json(CONFIG_FILE, db)
+            logger.info(f"微信用户登录: {wxid}")
+            return jsonify({"openid": wxid, "status": "ok"})
+        else:
+            return jsonify({"error": data.get("errmsg", "微信接口错误")}), 400
+    except Exception as e:
+        logger.error(f"微信登录失败: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# 初始化数据库结构
+def init_db():
+    global db
+    if "reminders" not in db:
+        db["reminders"] = []
+    if "settings" not in db:
+        db["settings"] = {"sound": True, "vibrate": True, "notify": True, "dark": True}
+    if "users" not in db:
+        db["users"] = {}
+    if "logs" not in db:
+        db["logs"] = []
+
 if __name__ == "__main__":
     try:
         from waitress import serve
         logger.info(f"Life Reminder Engine v3.2.1 启动中...")
         logger.info(f"服务端口: {APP_PORT}")
         logger.info(f"时区: {TZ}")
-        
-        # 初始化调度器
+
+        init_db()
         update_scheduler()
-        
-        # 启动服务
+
         logger.info("服务启动成功，监听 0.0.0.0:%d" % APP_PORT)
         serve(app, host="0.0.0.0", port=APP_PORT)
     except ImportError as e:
