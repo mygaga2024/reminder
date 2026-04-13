@@ -396,11 +396,11 @@ def wx_login():
         if not code:
             return jsonify({"error": "code 不能为空"}), 400
 
-        appid = db["settings"].get("wx_appid", "")
-        secret = db["settings"].get("wx_secret", "")
+        appid = os.getenv("WX_APPID", "")
+        secret = os.getenv("WX_SECRET", "")
 
         if not appid or not secret:
-            return jsonify({"error": "未配置微信AppID和Secret，请在网页端设置"}), 400
+            return jsonify({"error": "未配置微信AppID和Secret，请检查环境变量"}), 400
 
         import urllib.request
         import urllib.parse
