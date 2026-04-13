@@ -43,7 +43,7 @@ logger.addHandler(stream_handler)
 logger.setLevel(logging.INFO)
 
 # 环境变量配置
-VERSION = "3.2.4"
+VERSION = "3.2.6"
 DATA_DIR = os.getenv("DATA_DIR", "/app/data")
 APP_PORT = int(os.getenv("APP_PORT", 5000))
 TZ = os.getenv("TZ", "Asia/Shanghai")
