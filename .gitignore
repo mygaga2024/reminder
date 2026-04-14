@@ -19,3 +19,6 @@ reminder_history.json
 
 # Local protocol (not for git)
 .code_protocol.md
+
+# Node.js (for miniapp, currently paused)
+package-lock.json
