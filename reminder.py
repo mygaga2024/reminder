@@ -1,4 +1,3 @@
-import time
 import datetime
 import os
 import logging
@@ -8,11 +7,15 @@ import re
 import uuid
 import zoneinfo
 import random
-from flask import Flask, request, jsonify, render_template_string
+import threading
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
+
+DATETIME_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$')
+TIME_PATTERN = re.compile(r'^\d{1,2}:\d{2}$')
 
 TIPS_LIST = [
     "💡 每天一苹果，医生远离我！",
@@ -55,6 +58,8 @@ logger = logging.getLogger()
 logger.addHandler(log_handler)
 logger.addHandler(stream_handler)
 logger.setLevel(logging.INFO)
+
+db_lock = threading.RLock()
 
 # 环境变量配置
 VERSION = "3.2.9"
@@ -103,22 +108,23 @@ def load_json(filepath, default):
 
 def save_json(filepath, data):
     """保存JSON文件，使用原子写入防止数据损坏"""
-    try:
-        dir_path = os.path.dirname(filepath)
-        if dir_path and not os.path.exists(dir_path):
-            os.makedirs(dir_path, exist_ok=True)
-            logger.info(f"创建目录: {dir_path}")
-        
-        temp_file = filepath + ".tmp"
-        with open(temp_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-            f.flush()
-            os.fsync(f.fileno())
-        
-        os.replace(temp_file, filepath)
-        logger.info(f"成功保存文件: {filepath}")
-    except Exception as e:
-        logger.error(f"保存文件失败 ({filepath}): {e}")
+    with db_lock:
+        try:
+            dir_path = os.path.dirname(filepath)
+            if dir_path and not os.path.exists(dir_path):
+                os.makedirs(dir_path, exist_ok=True)
+                logger.info(f"创建目录: {dir_path}")
+            
+            temp_file = filepath + ".tmp"
+            with open(temp_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            
+            os.replace(temp_file, filepath)
+            logger.info(f"成功保存文件: {filepath}")
+        except Exception as e:
+            logger.error(f"保存文件失败 ({filepath}): {e}")
 
 # 加载数据
 db = load_json(CONFIG_FILE, {
@@ -150,25 +156,26 @@ logger.info(f"=====================")
 
 def notify_engine(reminder):
     """通知引擎，添加详细的错误处理"""
-    try:
-        rep = reminder.get("repeat", "none")
-        
-        if rep == "workday":
-            today = datetime.date.today()
-            if not is_china_workday(today):
-                logger.info(f"工作日任务跳过（非法定工作日）: {reminder.get('title')} - {today}")
-                return
-        
-        s = db["settings"]
-        title = reminder.get("title", "未命名提醒")
-        now = datetime.datetime.now()
-        date_str = now.strftime('%Y年%m月%d日')
-        time_str = now.strftime('%H:%M')
-        
-        tip = random.choice(TIPS_LIST)
-        
-        rep_label = {"once": "一次性", "daily": "每天", "weekly": "每周", "workday": "工作日"}.get(rep, "每天")
-        msg = f"""⏰ 您有一个提醒！
+    with db_lock:
+        try:
+            rep = reminder.get("repeat", "none")
+            
+            if rep == "workday":
+                today = datetime.date.today()
+                if not is_china_workday(today):
+                    logger.info(f"工作日任务跳过（非法定工作日）: {reminder.get('title')} - {today}")
+                    return
+            
+            s = db["settings"]
+            title = reminder.get("title", "未命名提醒")
+            now = datetime.datetime.now()
+            date_str = now.strftime('%Y年%m月%d日')
+            time_str = now.strftime('%H:%M')
+            
+            tip = random.choice(TIPS_LIST)
+            
+            rep_label = {"once": "一次性", "daily": "每天", "weekly": "每周", "workday": "工作日"}.get(rep, "每天")
+            msg = f"""⏰ 您有一个提醒！
 
 📝 提醒内容：{title}
 📅 提醒时间：{date_str} {time_str}
@@ -176,47 +183,56 @@ def notify_engine(reminder):
 
 {tip}"""
 
-        # 发送通知
-        for platform, url in s.get("webhooks", {}).items():
-            if not url: continue
-            try:
-                if platform in ["wecom", "dingtalk", "lark"]:
-                    payload = {"msgtype": "text", "text": {"content": msg}}
-                    if platform == "lark":
-                        payload = {"msg_type": "text", "content": {"text": msg}}
-                    
-                    # 添加超时处理
-                    resp = requests.post(url, json=payload, timeout=10)
-                    if resp.status_code == 200:
-                        logger.info(f"推送成功 ({platform})")
-                    else:
-                        logger.error(f"推送失败 ({platform}): HTTP {resp.status_code}")
-            except requests.RequestException as e:
-                logger.error(f"网络错误 ({platform}): {e}")
-            except Exception as e:
-                logger.error(f"推送异常 ({platform}): {e}")
+            # 发送通知
+            for platform, url in s.get("webhooks", {}).items():
+                if not url: continue
+                try:
+                    if platform in ["wecom", "dingtalk", "lark"]:
+                        payload = {"msgtype": "text", "text": {"content": msg}}
+                        if platform == "lark":
+                            payload = {"msg_type": "text", "content": {"text": msg}}
+                        
+                        resp = requests.post(url, json=payload, timeout=10)
+                        if resp.status_code == 200:
+                            logger.info(f"推送成功 ({platform})")
+                        else:
+                            logger.error(f"推送失败 ({platform}): HTTP {resp.status_code}")
+                except requests.RequestException as e:
+                    logger.error(f"网络错误 ({platform}): {e}")
+                except Exception as e:
+                    logger.error(f"推送异常 ({platform}): {e}")
 
-        # 记录日志
-        log_entry = {
-            "id": str(uuid.uuid4()),
-            "reminder_id": reminder.get("id", "unknown"),
-            "title": title,
-            "triggered_at": datetime.datetime.now().isoformat(),
-            "completed_at": None,
-            "status": "triggered"
-        }
-        logs.append(log_entry)
-        save_json(LOGS_FILE, logs)
-        logger.info(f"提醒已触发: {title}")
+            # 记录日志
+            log_entry = {
+                "id": str(uuid.uuid4()),
+                "reminder_id": reminder.get("id", "unknown"),
+                "title": title,
+                "triggered_at": datetime.datetime.now().isoformat(),
+                "completed_at": None,
+                "status": "triggered"
+            }
+            logs.append(log_entry)
+            
+            # 清理超过30天的日志
+            cutoff = (datetime.datetime.now() - datetime.timedelta(days=30)).isoformat()
+            logs[:] = [l for l in logs if l.get("triggered_at", "") > cutoff]
+            
+            save_json(LOGS_FILE, logs)
+            logger.info(f"提醒已触发: {title}")
 
-        # 一次性任务触发后自动删除
-        if rep == "once":
-            rid = reminder.get("id")
-            db["reminders"] = [r for r in db["reminders"] if r.get("id") != rid]
-            save_json(CONFIG_FILE, db)
-            logger.info(f"一次性任务已自动删除: {title}")
-    except Exception as e:
-        logger.error(f"通知引擎错误: {e}")
+            # 一次性任务触发后自动删除并从调度器移除
+            if rep == "once":
+                rid = reminder.get("id")
+                try:
+                    scheduler.remove_job(rid)
+                    logger.info(f"调度任务已移除: {rid}")
+                except Exception as e:
+                    logger.warning(f"移除调度任务失败: {e}")
+                db["reminders"] = [r for r in db["reminders"] if r.get("id") != rid]
+                save_json(CONFIG_FILE, db)
+                logger.info(f"一次性任务已自动删除: {title}")
+        except Exception as e:
+            logger.error(f"通知引擎错误: {e}")
 
 def is_china_workday(check_date=None):
     """检查指定日期是否为工作日（考虑中国法定节假日）"""
@@ -243,70 +259,72 @@ def get_next_workday(from_date=None):
 
 def update_scheduler():
     """更新调度器，添加详细的错误处理"""
-    try:
-        scheduler.remove_all_jobs()
-        logger.info("清空现有调度任务")
-        
-        if CHINESE_CALENDAR_AVAILABLE:
-            logger.info("中国法定节假日支持已启用")
-        else:
-            logger.info("中国法定节假日支持未启用，使用简单工作日判断")
-        
-        for r in db["reminders"]:
-            if r.get("status") == "completed":
-                continue
+    with db_lock:
+        try:
+            scheduler.remove_all_jobs()
+            logger.info("清空现有调度任务")
             
-            try:
-                t_str = r.get("time")
-                rep = r.get("repeat", "none")
-                
-                if not t_str:
-                    logger.warning(f"提醒缺少时间配置: {r.get('title')}")
+            if CHINESE_CALENDAR_AVAILABLE:
+                logger.info("中国法定节假日支持已启用")
+            else:
+                logger.info("中国法定节假日支持未启用，使用简单工作日判断")
+            
+            for r in db["reminders"]:
+                if r.get("status") == "completed":
                     continue
                 
-                trigger = None
-                if re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}', t_str):
-                    target_dt = datetime.datetime.strptime(t_str, '%Y-%m-%d %H:%M')
-                    target_dt = target_dt.replace(tzinfo=TZ_ENV)
-                    if target_dt <= datetime.datetime.now(TZ_ENV):
-                        target_dt += datetime.timedelta(days=1)
-                    trigger = DateTrigger(run_date=target_dt)
-                elif re.match(r'^\d{1,2}:\d{2}', t_str):
-                    h, m = t_str.split(':')[:2]
-                    if rep == "daily":
-                        trigger = CronTrigger(hour=h, minute=m)
-                    elif rep.startswith("weekly:"):
-                        days = rep.split(":")[1]
-                        trigger = CronTrigger(day_of_week=days, hour=h, minute=m)
-                    elif rep == "workday":
-                        trigger = CronTrigger(hour=h, minute=m)
+                try:
+                    t_str = r.get("time")
+                    rep = r.get("repeat", "none")
+                    
+                    if not t_str:
+                        logger.warning(f"提醒缺少时间配置: {r.get('title')}")
+                        continue
+                    
+                    trigger = None
+                    if DATETIME_PATTERN.match(t_str):
+                        target_dt = datetime.datetime.strptime(t_str, '%Y-%m-%d %H:%M')
+                        target_dt = target_dt.replace(tzinfo=TZ_ENV)
+                        if target_dt <= datetime.datetime.now(TZ_ENV):
+                            target_dt += datetime.timedelta(days=1)
+                        trigger = DateTrigger(run_date=target_dt)
+                    elif TIME_PATTERN.match(t_str):
+                        h, m = t_str.split(':')[:2]
+                        if rep == "daily":
+                            trigger = CronTrigger(hour=h, minute=m)
+                        elif rep.startswith("weekly:"):
+                            days = rep.split(":")[1]
+                            trigger = CronTrigger(day_of_week=days, hour=h, minute=m)
+                        elif rep == "workday":
+                            trigger = CronTrigger(hour=h, minute=m, day_of_week='mon-fri')
+                        else:
+                            target_datetime = datetime.datetime.combine(datetime.date.today(), datetime.time(int(h), int(m)))
+                            if target_datetime <= datetime.datetime.now(TZ_ENV):
+                                target_datetime += datetime.timedelta(days=1)
+                            trigger = DateTrigger(run_date=target_datetime)
+                    
+                    if trigger:
+                        scheduler.add_job(notify_engine, trigger, args=[r], id=r.get('id'))
+                        logger.info(f"添加调度任务: {r.get('title')} - {t_str} (重复: {rep})")
                     else:
-                        target_datetime = datetime.datetime.combine(datetime.date.today(), datetime.time(int(h), int(m)))
-                        if target_datetime <= datetime.datetime.now(TZ_ENV):
-                            target_datetime += datetime.timedelta(days=1)
-                        trigger = DateTrigger(run_date=target_datetime)
-                
-                if trigger:
-                    scheduler.add_job(notify_engine, trigger, args=[r], id=r.get('id'))
-                    logger.info(f"添加调度任务: {r.get('title')} - {t_str} (重复: {rep})")
-                else:
-                    logger.warning(f"无法创建触发器: {r.get('title')} - {t_str}")
-            except Exception as e:
-                logger.error(f"调度任务失败 ({r.get('title')}): {e}")
-        
-        if not scheduler.running:
-            scheduler.start()
-            logger.info("调度器已启动")
-    except Exception as e:
-        logger.error(f"更新调度器错误: {e}")
+                        logger.warning(f"无法创建触发器: {r.get('title')} - {t_str}")
+                except Exception as e:
+                    logger.error(f"调度任务失败 ({r.get('title')}): {e}")
+            
+            if not scheduler.running:
+                scheduler.start()
+                logger.info("调度器已启动")
+        except Exception as e:
+            logger.error(f"更新调度器错误: {e}")
 
 # --- API ---
 @app.route('/')
 def home():
-    """首页，添加错误处理"""
+    """首页"""
     try:
         with open('templates/index.html', 'r', encoding='utf-8') as f:
-            return render_template_string(f.read())
+            content = f.read()
+        return content, 200, {'Content-Type': 'text/html; charset=utf-8'}
     except FileNotFoundError:
         logger.error("index.html文件不存在")
         return "错误：无法加载页面", 500
@@ -317,131 +335,140 @@ def home():
 @app.route('/api/state')
 def get_state():
     """获取系统状态"""
-    try:
-        return jsonify({"db": db, "logs": logs[-100:], "syslogs": log_handler.logs[::-1], "version": VERSION})
-    except Exception as e:
-        logger.error(f"获取状态失败: {e}")
-        return jsonify({"error": str(e)}), 500
+    with db_lock:
+        try:
+            return jsonify({"db": db, "logs": logs[-100:], "syslogs": log_handler.logs[::-1], "version": VERSION})
+        except Exception as e:
+            logger.error(f"获取状态失败: {e}")
+            return jsonify({"error": "获取状态失败"}), 500
 
 @app.route('/api/reminders', methods=['POST'])
 def add_reminder():
     """添加提醒"""
-    try:
-        r = request.json
-        if not r:
-            return jsonify({"error": "请求数据为空"}), 400
-        
-        r.update({"id": str(uuid.uuid4()), "status": "pending", "created_at": datetime.datetime.now().isoformat()})
-        db["reminders"].append(r)
-        save_json(CONFIG_FILE, db)
-        update_scheduler()
-        logger.info(f"添加提醒: {r.get('title')}")
-        return jsonify(r)
-    except Exception as e:
-        logger.error(f"添加提醒失败: {e}")
-        return jsonify({"error": str(e)}), 500
+    with db_lock:
+        try:
+            r = request.json
+            if not r:
+                return jsonify({"error": "请求数据为空"}), 400
+            
+            r.update({"id": str(uuid.uuid4()), "status": "pending", "created_at": datetime.datetime.now().isoformat()})
+            db["reminders"].append(r)
+            save_json(CONFIG_FILE, db)
+            update_scheduler()
+            logger.info(f"添加提醒: {r.get('title')}")
+            return jsonify(r)
+        except Exception as e:
+            logger.error(f"添加提醒失败: {e}")
+            return jsonify({"error": "添加提醒失败"}), 500
 
 @app.route('/api/reminders/<rid>', methods=['PUT', 'DELETE'])
 def mod_reminder(rid):
     """修改或删除提醒"""
-    try:
-        if request.method == 'DELETE':
-            db["reminders"] = [r for r in db["reminders"] if r["id"] != rid]
-            logger.info(f"删除提醒: {rid}")
-        else:
-            update = request.json
-            if not update:
-                return jsonify({"error": "请求数据为空"}), 400
+    with db_lock:
+        try:
+            if request.method == 'DELETE':
+                db["reminders"] = [r for r in db["reminders"] if r["id"] != rid]
+                try:
+                    scheduler.remove_job(rid)
+                except Exception:
+                    pass
+                logger.info(f"删除提醒: {rid}")
+            else:
+                update = request.json
+                if not update:
+                    return jsonify({"error": "请求数据为空"}), 400
+                
+                for i, r in enumerate(db["reminders"]):
+                    if r["id"] == rid:
+                        if update.get("status") == "completed" and r["status"] != "completed":
+                            for l in reversed(logs):
+                                if l["reminder_id"] == rid and not l["completed_at"]:
+                                    l["completed_at"] = datetime.datetime.now().isoformat()
+                                    break
+                            save_json(LOGS_FILE, logs)
+                        db["reminders"][i].update(update)
+                        logger.info(f"更新提醒: {r.get('title')}")
+                        break
             
-            for i, r in enumerate(db["reminders"]):
-                if r["id"] == rid:
-                    if update.get("status") == "completed" and r["status"] != "completed":
-                        for l in reversed(logs):
-                            if l["reminder_id"] == rid and not l["completed_at"]:
-                                l["completed_at"] = datetime.datetime.now().isoformat()
-                                save_json(LOGS_FILE, logs)
-                                break
-                    db["reminders"][i].update(update)
-                    logger.info(f"更新提醒: {r.get('title')}")
-                    break
-        
-        save_json(CONFIG_FILE, db)
-        update_scheduler()
-        return jsonify({"status": "ok"})
-    except Exception as e:
-        logger.error(f"修改提醒失败: {e}")
-        return jsonify({"error": str(e)}), 500
+            save_json(CONFIG_FILE, db)
+            update_scheduler()
+            return jsonify({"status": "ok"})
+        except Exception as e:
+            logger.error(f"修改提醒失败: {e}")
+            return jsonify({"error": "修改提醒失败"}), 500
 
 @app.route('/api/settings', methods=['POST'])
 def mod_settings():
     """修改设置"""
-    try:
-        update = request.json
-        if not update:
-            return jsonify({"error": "请求数据为空"}), 400
+    with db_lock:
+        try:
+            update = request.json
+            if not update:
+                return jsonify({"error": "请求数据为空"}), 400
 
-        db["settings"].update(update)
-        save_json(CONFIG_FILE, db)
-        logger.info("更新设置")
-        return jsonify({"status": "ok"})
-    except Exception as e:
-        logger.error(f"修改设置失败: {e}")
-        return jsonify({"error": str(e)}), 500
+            db["settings"].update(update)
+            save_json(CONFIG_FILE, db)
+            logger.info("更新设置")
+            return jsonify({"status": "ok"})
+        except Exception as e:
+            logger.error(f"修改设置失败: {e}")
+            return jsonify({"error": "修改设置失败"}), 500
 
 @app.route('/api/wxlogin', methods=['POST'])
 def wx_login():
     """微信登录"""
-    try:
-        code = request.json.get('code')
-        if not code:
-            return jsonify({"error": "code 不能为空"}), 400
+    with db_lock:
+        try:
+            code = request.json.get('code')
+            if not code:
+                return jsonify({"error": "code 不能为空"}), 400
 
-        appid = os.getenv("WX_APPID", "")
-        secret = os.getenv("WX_SECRET", "")
+            appid = os.getenv("WX_APPID", "")
+            secret = os.getenv("WX_SECRET", "")
 
-        if not appid or not secret:
-            return jsonify({"error": "未配置微信AppID和Secret，请检查环境变量"}), 400
+            if not appid or not secret:
+                return jsonify({"error": "未配置微信AppID和Secret，请检查环境变量"}), 400
 
-        import urllib.request
-        import urllib.parse
-        url = f"https://api.weixin.qq.com/sns/jscode2session?appid={appid}&secret={secret}&js_code={code}&grant_type=authorization_code"
-        with urllib.request.urlopen(url, timeout=10) as resp:
-            data = json.loads(resp.read().decode())
+            import urllib.request
+            url = f"https://api.weixin.qq.com/sns/jscode2session?appid={appid}&secret={secret}&js_code={code}&grant_type=authorization_code"
+            with urllib.request.urlopen(url, timeout=10) as resp:
+                data = json.loads(resp.read().decode())
 
-        if "openid" in data:
-            wxid = data["openid"]
-            if "users" not in db:
-                db["users"] = {}
-            if wxid not in db["users"]:
-                db["users"][wxid] = {
-                    "openid": wxid,
-                    "created_at": datetime.datetime.now().isoformat()
-                }
-            save_json(CONFIG_FILE, db)
-            logger.info(f"微信用户登录: {wxid}")
-            return jsonify({"openid": wxid, "status": "ok"})
-        else:
-            return jsonify({"error": data.get("errmsg", "微信接口错误")}), 400
-    except Exception as e:
-        logger.error(f"微信登录失败: {e}")
-        return jsonify({"error": str(e)}), 500
+            if "openid" in data:
+                wxid = data["openid"]
+                if "users" not in db:
+                    db["users"] = {}
+                if wxid not in db["users"]:
+                    db["users"][wxid] = {
+                        "openid": wxid,
+                        "created_at": datetime.datetime.now().isoformat()
+                    }
+                save_json(CONFIG_FILE, db)
+                logger.info(f"微信用户登录: {wxid}")
+                return jsonify({"openid": wxid, "status": "ok"})
+            else:
+                logger.error(f"微信接口返回错误: {data.get('errmsg', 'unknown')}")
+                return jsonify({"error": "微信接口错误"}), 400
+        except Exception as e:
+            logger.error(f"微信登录失败: {e}")
+            return jsonify({"error": "微信登录失败"}), 500
 
 # 初始化数据库结构
 def init_db():
-    global db
+    global db, logs
     if "reminders" not in db:
         db["reminders"] = []
     if "settings" not in db:
         db["settings"] = {"sound": True, "vibrate": True, "notify": True, "dark": True}
     if "users" not in db:
         db["users"] = {}
-    if "logs" not in db:
-        db["logs"] = []
+    if "logs" not in logs:
+        logs = []
 
 if __name__ == "__main__":
     try:
         from waitress import serve
-        logger.info(f"Life Reminder Engine v3.2.1 启动中...")
+        logger.info(f"Life Reminder Engine v{VERSION} 启动中...")
         logger.info(f"服务端口: {APP_PORT}")
         logger.info(f"时区: {TZ}")
 
