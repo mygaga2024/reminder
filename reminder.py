@@ -62,7 +62,7 @@ logger.setLevel(logging.INFO)
 db_lock = threading.RLock()
 
 # 环境变量配置
-VERSION = "3.2.9"
+VERSION = "3.2.10"
 DATA_DIR = os.getenv("DATA_DIR", "/app/data")
 APP_PORT = int(os.getenv("APP_PORT", 5000))
 TZ = os.getenv("TZ", "Asia/Shanghai")
