@@ -1,0 +1,11 @@
+services:
+  reminder:
+    image: ghcr.io/mygaga2024/reminder:latest
+    container_name: reminder
+    restart: always
+    ports:
+      - "35015:5000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - TZ=Asia/Shanghai
