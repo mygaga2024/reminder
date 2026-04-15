@@ -9,5 +9,3 @@ services:
       - ./data:/app/data
     environment:
       - TZ=Asia/Shanghai
-      - WX_APPID=wx25fb6f94762a07ea
-      - WX_SECRET=556f18c8c34b12001287fab0d8e6187d
