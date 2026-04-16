@@ -674,7 +674,7 @@ input, select, button, textarea { font-family: inherit; }
             </div>
 
             <div class="footer-info">
-                Life Reminder v<span id="appVersion">3.2.1</span><br>
+                Life Reminder v<span id="appVersion">3.2.12</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -777,8 +777,8 @@ input, select, button, textarea { font-family: inherit; }
         <div id="help-wecom" style="display:none; margin-top:16px; font-size:0.8rem; color:var(--c-text3); line-height:1.6; background:var(--c-surface2); padding:12px; border-radius:12px; text-align:left;">
             <strong>配置步骤：</strong><br>
             1. 打开企业微信，进入目标群聊<br>
-            2. 点击右上角「...」打开群设置<br>
-            3. 找到「群机器人」，点击「添加」<br>
+            2. 点击右上角「...」<br>
+            3. 找到「消息推送」，点击「添加」<br>
             4. 命名并添加后，复制 Webhook 地址<br>
             5. 将地址粘贴到上方输入框中保存体验
         </div>
@@ -1524,6 +1524,28 @@ function openSheet(id) {
 
 function openAbout() {
     const currentVer = S.version || 'unknown';
+    const versionHistory = [
+        { version: 'v3.2.12', changes: ['更新企业微信配置说明文案', '补充关于页版本历史展示并保留v3.2.4条目'] },
+        { version: 'v3.2.10', changes: ['修复模板应用时weekly类型repeat参数处理'] },
+        { version: 'v3.2.9', changes: ['安全漏洞修复与多线程稳定性改进', '添加线程安全锁保护全局状态访问', '修复一次性任务未从调度器移除的问题'] },
+        { version: 'v3.2.8', changes: ['优化底部菜单栏适配', '新增提醒模板功能'] },
+        { version: 'v3.2.7', changes: ['同步VERSION至v3.2.7'] },
+        { version: 'v3.2.6', changes: ['修复一次性任务字段不匹配(once vs none)', '同步VERSION至v3.2.6'] },
+        { version: 'v3.2.5', changes: ['修复REMINDERS_FILE未定义导致删除失败'] },
+        { version: 'v3.2.4', changes: ['同步VERSION至v3.2.4'] },
+        { version: 'v3.2.3', changes: ['修复一次性任务触发后无法删除的问题', '删除重复的关于标签'] },
+        { version: 'v3.2.2', changes: ['修复ZoneInfo时区转换错误', '一次性任务触发后自动从列表删除', '优化容器权限配置'] },
+        { version: 'v3.2.1', changes: ['优化数据持久化，原子写入防止数据损坏', '增强错误处理和诊断日志', '优化首页UI，改进任务卡片布局'] },
+        { version: 'v3.2.0', changes: ['交付专业排序循环逻辑', '全功能农历语义日历', '智能日期语义化标签（今天/明天/后天）'] }
+    ];
+    const historyHtml = versionHistory.map(item => `
+            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
+                <div style="font-weight: 700; color: var(--c-text1); margin-bottom: 8px;">${item.version}</div>
+                <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
+                    ${item.changes.map(change => `<li>${change}</li>`).join('')}
+                </ul>
+            </div>
+    `).join('');
     const aboutContent = `
         <div style="padding: 20px; max-height: 70vh; overflow-y: auto;">
             <h2 style="margin-bottom: 20px; text-align: center;">📋 版本历史</h2>
@@ -1533,83 +1555,7 @@ function openAbout() {
                     <span style="font-size: 0.75rem; color: var(--c-green);">当前版本</span>
                 </div>
             </div>
-            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                <div style="font-weight: 700; color: var(--c-text1); margin-bottom: 8px;">v3.2.10</div>
-                <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
-                    <li>修复模板应用时weekly类型repeat参数处理</li>
-                </ul>
-            </div>
-            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                <div style="font-weight: 700; color: var(--c-text1); margin-bottom: 8px;">v3.2.9</div>
-                <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
-                    <li>安全漏洞修复与多线程稳定性改进</li>
-                    <li>添加线程安全锁保护全局状态访问</li>
-                    <li>修复一次性任务未从调度器移除的问题</li>
-                </ul>
-            </div>
-            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                <div style="font-weight: 700; color: var(--c-text1); margin-bottom: 8px;">v3.2.8</div>
-                <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
-                    <li>优化底部菜单栏适配</li>
-                    <li>新增提醒模板功能</li>
-                </ul>
-            </div>
-            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                <div style="font-weight: 700; color: var(--c-text1); margin-bottom: 8px;">v3.2.7</div>
-                <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
-                    <li>同步VERSION至v3.2.7</li>
-                </ul>
-            </div>
-            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                <div style="font-weight: 700; color: var(--c-text1); margin-bottom: 8px;">v3.2.6</div>
-                <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
-                    <li>修复一次性任务字段不匹配(once vs none)</li>
-                    <li>同步VERSION至v3.2.6</li>
-                </ul>
-            </div>
-            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                <div style="font-weight: 700; color: var(--c-text1); margin-bottom: 8px;">v3.2.5</div>
-                <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
-                    <li>修复REMINDERS_FILE未定义导致删除失败</li>
-                </ul>
-            </div>
-            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                <div style="font-weight: 700; color: var(--c-text1); margin-bottom: 8px;">v3.2.4</div>
-                <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
-                    <li>同步VERSION至v3.2.4</li>
-                </ul>
-            </div>
-            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                <div style="font-weight: 700; color: var(--c-text1); margin-bottom: 8px;">v3.2.3</div>
-                <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
-                    <li>修复一次性任务触发后无法删除的问题</li>
-                    <li>删除重复的关于标签</li>
-                </ul>
-            </div>
-            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                <div style="font-weight: 700; color: var(--c-text1); margin-bottom: 8px;">v3.2.2</div>
-                <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
-                    <li>修复ZoneInfo时区转换错误</li>
-                    <li>一次性任务触发后自动从列表删除</li>
-                    <li>优化容器权限配置</li>
-                </ul>
-            </div>
-            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                <div style="font-weight: 700; color: var(--c-text1); margin-bottom: 8px;">v3.2.1</div>
-                <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
-                    <li>优化数据持久化，原子写入防止数据损坏</li>
-                    <li>增强错误处理和诊断日志</li>
-                    <li>优化首页UI，改进任务卡片布局</li>
-                </ul>
-            </div>
-            <div style="background: var(--c-surface2); border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                <div style="font-weight: 700; color: var(--c-text1); margin-bottom: 8px;">v3.2.0</div>
-                <ul style="margin: 0; padding-left: 20px; font-size: 0.85rem; color: var(--c-text2); line-height: 1.8;">
-                    <li>交付专业排序循环逻辑</li>
-                    <li>全功能农历语义日历</li>
-                    <li>智能日期语义化标签（今天/明天/后天）</li>
-                </ul>
-            </div>
+            ${historyHtml}
             <p style="text-align: center; margin-top: 20px; font-size: 0.8rem; color: var(--c-text3);">
                 Made with ♥ by <a href="https://github.com/mygaga2024" style="color: var(--c-blue);">mygaga2024</a>
             </p>
