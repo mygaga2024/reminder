@@ -674,7 +674,7 @@ input, select, button, textarea { font-family: inherit; }
             </div>
 
             <div class="footer-info">
-                Life Reminder v<span id="appVersion">3.2.12</span><br>
+                Life Reminder v<span id="appVersion">3.2.13</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -1525,7 +1525,9 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
+        { version: 'v3.2.13', changes: ['补充关于页缺失的v3.2.11版本历史'] },
         { version: 'v3.2.12', changes: ['更新企业微信配置说明文案', '补充关于页版本历史展示并保留v3.2.4条目'] },
+        { version: 'v3.2.11', changes: ['同步VERSION至v3.2.11', '修正版本历史顺序并补全v3.2.9'] },
         { version: 'v3.2.10', changes: ['修复模板应用时weekly类型repeat参数处理'] },
         { version: 'v3.2.9', changes: ['安全漏洞修复与多线程稳定性改进', '添加线程安全锁保护全局状态访问', '修复一次性任务未从调度器移除的问题'] },
         { version: 'v3.2.8', changes: ['优化底部菜单栏适配', '新增提醒模板功能'] },
