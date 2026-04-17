@@ -497,6 +497,7 @@ input, select, button, textarea { font-family: inherit; }
 .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .cal-header span { font-weight: 700; font-size: 0.9rem; }
 .cal-nav { width: 32px; height: 32px; border-radius: 8px; border: none; background: var(--c-surface2); color: var(--c-text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.cal-nav:disabled { opacity: 0.35; cursor: not-allowed; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
 .cal-dow { font-size: 0.65rem; color: var(--c-text3); font-weight: 700; padding: 4px 0; }
 .cal-day {
@@ -674,7 +675,7 @@ input, select, button, textarea { font-family: inherit; }
             </div>
 
             <div class="footer-info">
-                Life Reminder v<span id="appVersion">3.2.13</span><br>
+                Life Reminder v<span id="appVersion">3.2.14</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -1298,8 +1299,13 @@ function confirmTime() {
 let calYear, calMonth, calSelectedDate = null;
 function renderCalendar(y, m) {
     const now = new Date();
-    calYear = y !== undefined ? y : (calYear || now.getFullYear());
-    calMonth = m !== undefined ? m : (calMonth !== undefined ? calMonth : now.getMonth());
+    const baseYear = y !== undefined ? y : (calYear || now.getFullYear());
+    const baseMonth = m !== undefined ? m : (calMonth !== undefined ? calMonth : now.getMonth());
+    const normalizedDate = new Date(baseYear, baseMonth, 1);
+    const maxDate = new Date(2100, 11, 1);
+    const finalDate = normalizedDate > maxDate ? maxDate : normalizedDate;
+    calYear = finalDate.getFullYear();
+    calMonth = finalDate.getMonth();
 
     const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
     const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
@@ -1307,12 +1313,13 @@ function renderCalendar(y, m) {
     const startOffset = firstDay === 0 ? 6 : firstDay - 1; // Monday-first
 
     const monthNames = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+    const nextDisabled = calYear === 2100 && calMonth === 11;
 
     let html = `<div class="cal-wrap">`;
     html += `<div class="cal-header">`;
     html += `<button class="cal-nav" onclick="renderCalendar(${calYear},${calMonth - 1})"><i class="fas fa-chevron-left"></i></button>`;
     html += `<span>${calYear}年 ${monthNames[calMonth]}</span>`;
-    html += `<button class="cal-nav" onclick="renderCalendar(${calYear},${calMonth + 1})"><i class="fas fa-chevron-right"></i></button>`;
+    html += `<button class="cal-nav"${nextDisabled ? ' disabled' : ` onclick="renderCalendar(${calYear},${calMonth + 1})"`}><i class="fas fa-chevron-right"></i></button>`;
     html += `</div>`;
     html += `<div class="cal-grid">`;
     ['一','二','三','四','五','六','日'].forEach(d => html += `<div class="cal-dow">${d}</div>`);
@@ -1397,7 +1404,7 @@ function reopenCalendar() {
     document.getElementById('calendarPicker').style.display = 'block';
     document.getElementById('selectedDateDisplay').style.display = 'none';
     document.getElementById('dateFieldLabel').textContent = '选择日期';
-    renderCalendar();
+    renderCalendar(calYear, calMonth);
 }
 
 // ─── Create / Update Task ───
@@ -1409,6 +1416,15 @@ async function createTask() {
 
     if (!title) { document.getElementById('f_title').style.borderColor = 'var(--c-red)'; return; }
 
+    const timePickerBox = document.getElementById('timePickerBox');
+    if (timePickerBox.style.display === 'block') {
+        const pendingTime = `${document.getElementById('tp_hour').value || '09'}:${document.getElementById('tp_min').value || '00'}`;
+        if (pendingTime !== time) {
+            showToast('请先点击时间选择器底部的“确定”按钮', 'triangle-exclamation', '#ff9f0a');
+            return;
+        }
+    }
+
     // Build repeat string and resolve time
     const mode = document.querySelector('#repeatMode .active').dataset.val;
     let repeat = mode;
@@ -1418,6 +1434,10 @@ async function createTask() {
         repeat = days.length > 0 ? 'weekly:' + days.join(',') : 'daily';
     } else if (mode === 'once') {
         const dateVal = document.getElementById('f_date').value;
+        if (document.getElementById('calendarPicker').style.display === 'block' && calSelectedDate && calSelectedDate !== dateVal) {
+            showToast('请先点击日期选择器底部的“确定”按钮', 'triangle-exclamation', '#ff9f0a');
+            return;
+        }
         if (dateVal) {
             finalTime = `${dateVal} ${time}`;
         }
@@ -1525,6 +1545,7 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
+        { version: 'v3.2.14', changes: ['仅一次日期选择范围扩展并限制至2100年', '补充时间和日期未确认时的创建提醒拦截'] },
         { version: 'v3.2.13', changes: ['补充关于页缺失的v3.2.11版本历史'] },
         { version: 'v3.2.12', changes: ['更新企业微信配置说明文案', '补充关于页版本历史展示并保留v3.2.4条目'] },
         { version: 'v3.2.11', changes: ['同步VERSION至v3.2.11', '修正版本历史顺序并补全v3.2.9'] },
