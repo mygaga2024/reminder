@@ -280,7 +280,10 @@ def is_china_workday(check_date=None):
     if not CHINESE_CALENDAR_AVAILABLE:
         return check_date.weekday() < 5
     
-    return chinese_calendar.is_workday(check_date)
+    try:
+        return chinese_calendar.is_workday(check_date)
+    except Exception:
+        return check_date.weekday() < 5
 
 def get_next_workday(from_date=None):
     """获取下一个工作日"""
@@ -293,7 +296,14 @@ def get_next_workday(from_date=None):
             current += datetime.timedelta(days=1)
         return current
     
-    return chinese_calendar.get_next_workday(from_date)
+    try:
+        return chinese_calendar.get_next_workday(from_date)
+    except Exception:
+        current = from_date
+        while True:
+            current += datetime.timedelta(days=1)
+            if current.weekday() < 5:
+                return current
 
 def update_scheduler():
     with db_lock:
