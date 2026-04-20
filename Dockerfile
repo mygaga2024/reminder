@@ -3,14 +3,21 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-RUN useradd -m -s /bin/bash appuser && \
-    mkdir -p /app/data && \
-    chown -R appuser:appuser /app
+# 安装 gosu
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gosu \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --chown=appuser:appuser requirements.txt .
+# 创建基础目录
+RUN mkdir -p /app/data
+
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY --chown=appuser:appuser . .
+COPY . .
 
-USER appuser
-CMD ["python", "reminder.py"]
+# 确保脚本可执行
+RUN chmod +x /app/entrypoint.sh
+
+# 运行时由 entrypoint.sh 处理用户权限
+ENTRYPOINT ["/app/entrypoint.sh"]

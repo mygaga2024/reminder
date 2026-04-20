@@ -18,6 +18,7 @@ reminder_history.json
 .DS_Store
 
 # Local protocol (not for git)
+code_protocol.md
 .code_protocol.md
 
 # Node.js (for miniapp, currently paused)

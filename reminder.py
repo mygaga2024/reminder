@@ -69,18 +69,31 @@ TZ = os.getenv("TZ", "Asia/Shanghai")
 TZ_ENV = zoneinfo.ZoneInfo(TZ)
 
 # 确保数据目录存在
+logger.info(f"=== 环境诊断 ===")
+logger.info(f"当前用户 UID: {os.getuid()}, GID: {os.getgid()}")
 logger.info(f"数据存储目录: {DATA_DIR}")
+
 try:
     if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR)
+        os.makedirs(DATA_DIR, exist_ok=True)
         logger.info(f"创建数据目录: {DATA_DIR}")
-    # 检查目录权限
-    if os.access(DATA_DIR, os.W_OK):
-        logger.info("数据目录权限正常")
-    else:
-        logger.warning("数据目录无写入权限")
+    
+    # 检查目录权限和挂载状态
+    is_writable = os.access(DATA_DIR, os.W_OK)
+    is_mount = os.path.ismount(DATA_DIR)
+    logger.info(f"数据目录写入权限: {is_writable}")
+    logger.info(f"数据目录是否为挂载点: {is_mount}")
+    
+    if not is_writable:
+        logger.error(f"⚠️ 警告: 数据目录 {DATA_DIR} 无写入权限！持久化将失效。")
+        logger.error("建议检查 Docker 数据卷挂载权限或设置正确的 PUID/PGID。")
+    
+    # 列出目录下文件以供辅助诊断
+    existing_files = os.listdir(DATA_DIR)
+    logger.info(f"数据目录下现有文件: {existing_files}")
 except Exception as e:
-    logger.error(f"创建数据目录失败: {e}")
+    logger.error(f"环境环境诊断失败: {e}")
+logger.info(f"=====================")
 
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
 LOGS_FILE = os.path.join(DATA_DIR, "logs.json")
@@ -94,16 +107,28 @@ def load_json(filepath, default):
     """加载JSON文件，添加详细的错误处理"""
     if os.path.exists(filepath):
         try:
+            if os.path.getsize(filepath) == 0:
+                logger.warning(f"文件存在但为空，将初始化: {filepath}")
+                return default
             with open(filepath, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                logger.info(f"成功加载文件: {filepath}")
+                logger.info(f"成功加载文件: {filepath} (大小: {os.path.getsize(filepath)} bytes)")
                 return data
         except json.JSONDecodeError as e:
-            logger.error(f"JSON解析失败 ({filepath}): {e}")
+            logger.error(f"💥 JSON解析失败 ({filepath}): {e}. 文件可能损坏，请检查！")
+            # 不直接返回default，防止覆盖损坏的文件
+            # 如果是重要配置，这里可以考虑备份损坏文件
+            backup_path = filepath + ".bak_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            try:
+                import shutil
+                shutil.copy2(filepath, backup_path)
+                logger.info(f"由于解析失败，已备份损坏文件至: {backup_path}")
+            except Exception as be:
+                logger.error(f"备份损坏文件失败: {be}")
         except Exception as e:
             logger.error(f"读取文件失败 ({filepath}): {e}")
     else:
-        logger.info(f"文件不存在，使用默认值: {filepath}")
+        logger.info(f"文件不存在，将初始化: {filepath}")
     return default
 
 def save_json(filepath, data):
@@ -138,20 +163,12 @@ db = load_json(CONFIG_FILE, {
 })
 logs = load_json(LOGS_FILE, [])
 
-logger.info(f"=== 系统启动诊断 ===")
-logger.info(f"数据存储目录: {DATA_DIR}")
+logger.info(f"=== 系统启动摘要 ===")
+logger.info(f"时区: {TZ}")
 logger.info(f"配置文件路径: {CONFIG_FILE}")
-logger.info(f"日志文件路径: {LOGS_FILE}")
 logger.info(f"配置文件存在: {os.path.exists(CONFIG_FILE)}")
-logger.info(f"加载提醒数量: {len(db['reminders'])}")
+logger.info(f"加载提醒数量: {len(db.get('reminders', []))}")
 logger.info(f"加载日志数量: {len(logs)}")
-if os.path.exists(CONFIG_FILE):
-    try:
-        with open(CONFIG_FILE, "r") as f:
-            file_content = json.load(f)
-            logger.info(f"配置文件中提醒数量: {len(file_content.get('reminders', []))}")
-    except Exception as e:
-        logger.error(f"读取配置文件内容失败: {e}")
 logger.info(f"=====================")
 
 def notify_engine(reminder):
@@ -261,10 +278,12 @@ def update_scheduler():
     """更新调度器，添加详细的错误处理"""
     with db_lock:
         try:
-            scheduler.remove_all_jobs()
-            logger.info("清空现有调度任务")
+            job_count = len(scheduler.get_jobs())
+            if job_count > 0:
+                scheduler.remove_all_jobs()
+                logger.info(f"已清理旧调度任务 (共 {job_count} 个)")
             
-            if CHINESE_CALENDAR_AVAILABLE:
+            # 记录启用状态
                 logger.info("中国法定节假日支持已启用")
             else:
                 logger.info("中国法定节假日支持未启用，使用简单工作日判断")
@@ -456,13 +475,13 @@ def wx_login():
 # 初始化数据库结构
 def init_db():
     global db, logs
-    if "reminders" not in db:
+    if not isinstance(db.get("reminders"), list):
         db["reminders"] = []
     if "settings" not in db:
         db["settings"] = {"sound": True, "vibrate": True, "notify": True, "dark": True}
     if "users" not in db:
         db["users"] = {}
-    if "logs" not in logs:
+    if not isinstance(logs, list):
         logs = []
 
 if __name__ == "__main__":
