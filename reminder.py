@@ -296,7 +296,6 @@ def get_next_workday(from_date=None):
     return chinese_calendar.get_next_workday(from_date)
 
 def update_scheduler():
-    """更新调度器，添加详细的错误处理"""
     with db_lock:
         try:
             job_count = len(scheduler.get_jobs())

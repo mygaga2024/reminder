@@ -495,9 +495,24 @@ input, select, button, textarea { font-family: inherit; }
     border-radius: var(--radius); padding: 16px; margin-top: 8px;
 }
 .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.cal-header span { font-weight: 700; font-size: 0.9rem; }
+.cal-header span { font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: color 0.2s; }
+.cal-header span:hover { color: var(--c-blue); }
 .cal-nav { width: 32px; height: 32px; border-radius: 8px; border: none; background: var(--c-surface2); color: var(--c-text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .cal-nav:disabled { opacity: 0.35; cursor: not-allowed; }
+.cal-year-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    padding: 10px 0; max-height: 240px; overflow-y: auto;
+    scrollbar-width: thin;
+}
+.cal-year-grid::-webkit-scrollbar { width: 4px; }
+.cal-year-grid::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 10px; }
+.year-item {
+    padding: 12px; border-radius: 12px; font-size: 0.9rem; font-weight: 600;
+    text-align: center; cursor: pointer; transition: var(--transition);
+    background: var(--c-surface2); border: 1px solid transparent;
+}
+.year-item:hover { background: var(--c-surface); border-color: var(--c-blue); color: var(--c-blue); }
+.year-item.active { background: var(--c-blue); color: #fff; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
 .cal-dow { font-size: 0.65rem; color: var(--c-text3); font-weight: 700; padding: 4px 0; }
 .cal-day {
@@ -522,6 +537,7 @@ input, select, button, textarea { font-family: inherit; }
     background: var(--c-bg); border: 1px solid var(--c-border);
     border-radius: var(--radius); padding: 12px; margin-top: 8px;
     display: none; animation: fadeIn 0.2s;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.15);
 }
 .tp-cols { display: flex; gap: 10px; margin-bottom: 12px; }
 .tp-list {
@@ -749,7 +765,10 @@ input, select, button, textarea { font-family: inherit; }
                         <select id="tp_hour" class="tp-list" size="5"></select>
                         <select id="tp_min" class="tp-list" size="5"></select>
                     </div>
-                    <button class="cal-btn-confirm" style="width:100%; padding:12px; border:none; border-radius:10px; font-weight:600; cursor:pointer;" onclick="confirmTime()">确定</button>
+                    <div class="cal-actions" style="margin-top:10px;">
+                        <button class="cal-btn-cancel" onclick="toggleTimePicker()">取消</button>
+                        <button class="cal-btn-confirm" onclick="confirmTime()">确定</button>
+                    </div>
                 </div>
             </div>
             <div class="field" style="flex:1">
@@ -1341,6 +1360,37 @@ function confirmTime() {
 
 // ─── Calendar Picker (需求3) ───
 let calYear, calMonth, calSelectedDate = null;
+
+function renderYearPicker() {
+    const container = document.getElementById('calendarPicker');
+    if (!container) return;
+
+    let html = `<div class="cal-wrap">`;
+    html += `<div class="cal-header" style="justify-content: center;">`;
+    html += `<span>选择年份 (当前: ${calYear}年)</span>`;
+    html += `</div>`;
+    html += `<div class="cal-year-grid">`;
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    for (let y = currentYear; y <= 2100; y++) {
+        html += `<div class="year-item ${y === calYear ? 'active' : ''}" onclick="renderCalendar(${y}, calMonth)">${y}</div>`;
+    }
+    
+    html += `</div>`;
+    html += `<div class="cal-actions" style="margin-top:14px;">`;
+    html += `<button class="cal-btn-cancel" style="flex:1" onclick="renderCalendar(calYear, calMonth)">返回</button>`;
+    html += `</div></div>`;
+    
+    container.innerHTML = html;
+    
+    // Scroll to active year
+    setTimeout(() => {
+        const active = container.querySelector('.year-item.active');
+        if (active) active.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 50);
+}
+
 function renderCalendar(y, m) {
     const now = new Date();
     const baseYear = y !== undefined ? y : (calYear || now.getFullYear());
@@ -1362,7 +1412,7 @@ function renderCalendar(y, m) {
     let html = `<div class="cal-wrap">`;
     html += `<div class="cal-header">`;
     html += `<button class="cal-nav" onclick="renderCalendar(${calYear},${calMonth - 1})"><i class="fas fa-chevron-left"></i></button>`;
-    html += `<span>${calYear}年 ${monthNames[calMonth]}</span>`;
+    html += `<span onclick="renderYearPicker()">${calYear}年 ${monthNames[calMonth]}</span>`;
     html += `<button class="cal-nav"${nextDisabled ? ' disabled' : ` onclick="renderCalendar(${calYear},${calMonth + 1})"`}><i class="fas fa-chevron-right"></i></button>`;
     html += `</div>`;
     html += `<div class="cal-grid">`;
