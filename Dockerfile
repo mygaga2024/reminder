@@ -3,9 +3,10 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# 安装 gosu
+# 安装 gosu 和 tzdata
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gosu \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建基础目录

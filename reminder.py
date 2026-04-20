@@ -66,7 +66,11 @@ VERSION = "3.2.14"
 DATA_DIR = os.getenv("DATA_DIR", "/app/data")
 APP_PORT = int(os.getenv("APP_PORT", 5000))
 TZ = os.getenv("TZ", "Asia/Shanghai")
-TZ_ENV = zoneinfo.ZoneInfo(TZ)
+try:
+    TZ_ENV = zoneinfo.ZoneInfo(TZ)
+except Exception as e:
+    print(f"⚠️ Warning: Could not load timezone {TZ}: {e}. Falling back to UTC.")
+    TZ_ENV = zoneinfo.ZoneInfo("UTC")
 
 # --- Persistence Health Check ---
 PERSISTENCE_HEALTH = {"status": "ok", "error": None, "is_writable": False, "is_mount": False}
