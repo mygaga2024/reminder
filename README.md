@@ -28,6 +28,8 @@ services:
       - ./data:/app/data
     environment:
       - TZ=Asia/Shanghai
+      - PUID=1024  # 可选：NAS 用户 UID
+      - PGID=100   # 可选：NAS 用户 GID
 ```
 
 执行启动命令：
@@ -35,7 +37,16 @@ services:
 docker compose up -d
 ```
 
-### 方式 B：从源码构建
+### 方式 B：NAS 部署与权限配置 (推荐)
+在 NAS 环境（如群晖、威联通）中，为了确保数据能够正确持久化且不出现权限问题，建议在该目录下运行环境检查脚本：
+
+```bash
+bash scripts/check_env.sh
+```
+
+脚本会输出您当前用户的 `PUID` 和 `PGID`，请将输出的值填入 `docker-compose.yaml` 的 `environment` 节点中。
+
+### 方式 C：从源码构建
 ```bash
 git clone https://github.com/mygaga2024/reminder.git
 cd reminder
