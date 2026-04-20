@@ -545,6 +545,31 @@ input, select, button, textarea { font-family: inherit; }
     padding: 8px; border-radius: 8px; margin-bottom: 2px;
 }
 .tp-list option:checked { background: var(--c-blue); color: #fff; font-weight: bold; }
+.persistence-warning {
+    background: rgba(255, 69, 58, 0.1);
+    border: 1px solid rgba(255, 69, 58, 0.3);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    color: var(--c-red);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+.persistence-warning i { font-size: 1.2rem; }
+.persistence-warning .fix-btn {
+    margin-left: auto;
+    background: var(--c-red);
+    color: #fff;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+}
 
     </style>
 </head>
@@ -564,6 +589,16 @@ input, select, button, textarea { font-family: inherit; }
         <!-- ═══ TAB 1: 首页 ═══ -->
         <div id="v-home" class="view active">
             <div class="page-header"><h1 class="page-title" id="greetingText">晚上好</h1></div>
+
+            <!-- Persistence Warning Banner -->
+            <div id="persistWarning" class="persistence-warning">
+                <i class="fas fa-triangle-exclamation"></i>
+                <div>
+                    <strong>持久化锁定！</strong> 任务无法保存。<br>
+                    <span style="font-size:0.75rem; opacity:0.8">请检查极空间共享文件夹权限</span>
+                </div>
+                <button class="fix-btn" onclick="goTo('logs', document.querySelectorAll('.dock-btn')[3])">查看日志</button>
+            </div>
 
             <div class="hero-banner">
                 <div class="hero-text">
@@ -879,6 +914,15 @@ async function sync() {
         const res = await fetch('/api/state');
         S = await res.json();
         if (S.version) document.getElementById('appVersion').textContent = S.version;
+        
+        // Check persistence health
+        const warn = document.getElementById('persistWarning');
+        if (S.persistence && S.persistence.status !== 'ok') {
+            warn.style.display = 'flex';
+        } else {
+            warn.style.display = 'none';
+        }
+
         paintHome();
         paintData();
         paintLogs();

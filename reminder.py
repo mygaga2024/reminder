@@ -68,7 +68,10 @@ APP_PORT = int(os.getenv("APP_PORT", 5000))
 TZ = os.getenv("TZ", "Asia/Shanghai")
 TZ_ENV = zoneinfo.ZoneInfo(TZ)
 
-# 确保数据目录存在
+# --- Persistence Health Check ---
+PERSISTENCE_HEALTH = {"status": "ok", "error": None, "is_writable": False, "is_mount": False}
+
+# 确保数据目录存在并检测权限
 logger.info(f"=== 环境诊断 ===")
 logger.info(f"当前用户 UID: {os.getuid()}, GID: {os.getgid()}")
 logger.info(f"数据存储目录: {DATA_DIR}")
@@ -79,20 +82,33 @@ try:
         logger.info(f"创建数据目录: {DATA_DIR}")
     
     # 检查目录权限和挂载状态
-    is_writable = os.access(DATA_DIR, os.W_OK)
-    is_mount = os.path.ismount(DATA_DIR)
-    logger.info(f"数据目录写入权限: {is_writable}")
-    logger.info(f"数据目录是否为挂载点: {is_mount}")
+    PERSISTENCE_HEALTH["is_writable"] = os.access(DATA_DIR, os.W_OK)
+    PERSISTENCE_HEALTH["is_mount"] = os.path.ismount(DATA_DIR)
     
-    if not is_writable:
-        logger.error(f"⚠️ 警告: 数据目录 {DATA_DIR} 无写入权限！持久化将失效。")
-        logger.error("建议检查 Docker 数据卷挂载权限或设置正确的 PUID/PGID。")
+    # 增加物理写入测试 (Real Write Test)
+    test_file = os.path.join(DATA_DIR, ".write_test")
+    try:
+        with open(test_file, "w") as f:
+            f.write("test")
+        os.remove(test_file)
+        PERSISTENCE_HEALTH["real_write_test"] = True
+    except Exception as e:
+        PERSISTENCE_HEALTH["real_write_test"] = False
+        PERSISTENCE_HEALTH["error"] = str(e)
+        PERSISTENCE_HEALTH["status"] = "error"
+
+    logger.info(f"数据目录写入权限: {PERSISTENCE_HEALTH['is_writable']}")
+    logger.info(f"数据目录是否为挂载点: {PERSISTENCE_HEALTH['is_mount']}")
+    logger.info(f"物理写入测试: {PERSISTENCE_HEALTH.get('real_write_test')}")
     
-    # 列出目录下文件以供辅助诊断
-    existing_files = os.listdir(DATA_DIR)
-    logger.info(f"数据目录下现有文件: {existing_files}")
+    if PERSISTENCE_HEALTH["status"] == "error" or not PERSISTENCE_HEALTH["is_writable"]:
+        logger.error(f"⚠️ 关键警告: 数据目录 {DATA_DIR} 持久化能力受限！原因: {PERSISTENCE_HEALTH['error']}")
+        logger.error("极空间用户通过以下步骤修复：1. 开启合规目录最大读写权限；2. 调低 PUID/PGID 或设为 0。")
+    
 except Exception as e:
-    logger.error(f"环境环境诊断失败: {e}")
+    logger.error(f"环境诊断失败: {e}")
+    PERSISTENCE_HEALTH["status"] = "critical"
+    PERSISTENCE_HEALTH["error"] = str(e)
 logger.info(f"=====================")
 
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
@@ -138,7 +154,6 @@ def save_json(filepath, data):
             dir_path = os.path.dirname(filepath)
             if dir_path and not os.path.exists(dir_path):
                 os.makedirs(dir_path, exist_ok=True)
-                logger.info(f"创建目录: {dir_path}")
             
             temp_file = filepath + ".tmp"
             with open(temp_file, "w", encoding="utf-8") as f:
@@ -147,9 +162,15 @@ def save_json(filepath, data):
                 os.fsync(f.fileno())
             
             os.replace(temp_file, filepath)
+            # 记录最后成功写入时间，用于健康检查
+            PERSISTENCE_HEALTH["last_save"] = datetime.datetime.now().isoformat()
+            PERSISTENCE_HEALTH["status"] = "ok"
             logger.info(f"成功保存文件: {filepath}")
         except Exception as e:
+            PERSISTENCE_HEALTH["status"] = "error"
+            PERSISTENCE_HEALTH["error"] = str(e)
             logger.error(f"保存文件失败 ({filepath}): {e}")
+            raise # 抛出异常，让API层感知到持久化失败
 
 # 加载数据
 db = load_json(CONFIG_FILE, {
@@ -356,7 +377,13 @@ def get_state():
     """获取系统状态"""
     with db_lock:
         try:
-            return jsonify({"db": db, "logs": logs[-100:], "syslogs": log_handler.logs[::-1], "version": VERSION})
+            return jsonify({
+                "db": db, 
+                "logs": logs[-100:], 
+                "syslogs": log_handler.logs[::-1], 
+                "version": VERSION,
+                "persistence": PERSISTENCE_HEALTH
+            })
         except Exception as e:
             logger.error(f"获取状态失败: {e}")
             return jsonify({"error": "获取状态失败"}), 500
