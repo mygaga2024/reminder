@@ -47,6 +47,8 @@ services:
       - PUID=0
       - PGID=0
       - TZ=Asia/Shanghai
+    ports:
+      - "5000:5000"
     volumes:
       - /此处替换为极空间文件管理器中查看到的完整绝对路径/data:/app/data
 ```
