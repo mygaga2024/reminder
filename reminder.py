@@ -136,23 +136,34 @@ def load_json(filepath, default):
                 return data
         except json.JSONDecodeError as e:
             logger.error(f"💥 JSON解析失败 ({filepath}): {e}. 文件可能损坏，请检查！")
-            # 不直接返回default，防止覆盖损坏的文件
-            # 如果是重要配置，这里可以考虑备份损坏文件
-            backup_path = filepath + ".bak_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            backup_path = filepath + ".corrupt_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
             try:
                 import shutil
                 shutil.copy2(filepath, backup_path)
                 logger.info(f"由于解析失败，已备份损坏文件至: {backup_path}")
             except Exception as be:
                 logger.error(f"备份损坏文件失败: {be}")
+            # 重要：解析失败时不返回空数据，防止覆盖
+            raise RuntimeError(f"配置文件损坏，拒绝启动: {filepath}")
+        except PermissionError as e:
+            logger.error(f"🚫 权限拒绝 ({filepath}): {e}. 请检查极空间目录权限！")
+            # 重要：由于权限问题读不到数据时，绝不能返回空数据，否则后续 save_json 会清零文件
+            raise RuntimeError(f"因权限问题无法读取数据，为保护数据安全，程序拒绝启动: {filepath}")
         except Exception as e:
             logger.error(f"读取文件失败 ({filepath}): {e}")
+            raise
     else:
         logger.info(f"文件不存在，将初始化: {filepath}")
     return default
 
 def save_json(filepath, data):
-    """保存JSON文件，使用原子写入防止数据损坏"""
+    """保存JSON文件，使用原子写入并强制刷盘，防止由于NAS断电或权限抖动导致数据损坏"""
+    if not data or (isinstance(data, dict) and "reminders" in data and len(data["reminders"]) == 0):
+        # 最后的自保：如果数据为空且原文件很大，禁止覆盖（除非真的没有任务）
+        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+            logger.error(f"⚠️ 检测到尝试写入空数据到非空文件 {filepath}，已拦截！可能存在逻辑错误或读写冲突。")
+            return
+
     with db_lock:
         try:
             dir_path = os.path.dirname(filepath)
@@ -163,7 +174,7 @@ def save_json(filepath, data):
             with open(temp_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
                 f.flush()
-                os.fsync(f.fileno())
+                os.fsync(f.fileno()) # 强制刷回磁盘，防止NAS缓存丢失
             
             os.replace(temp_file, filepath)
             # 记录最后成功写入时间，用于健康检查
