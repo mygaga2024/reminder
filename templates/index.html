@@ -726,7 +726,8 @@ input, select, button, textarea { font-family: inherit; }
             </div>
 
             <div class="footer-info">
-                Life Reminder v<span id="appVersion">3.2.14</span><br>
+                <span id="authStatus"></span><br>
+                Life Reminder v<span id="appVersion">3.2.15</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -918,7 +919,18 @@ input, select, button, textarea { font-family: inherit; }
 <script>
 let S = null; // global state
 let weekChart = null;
-let hiddenLogs = new Set(); // track hidden log IDs locally
+// API Key: 通过 URL 参数 ?api_key=xxx 设置，或 localStorage 持久化
+const API_KEY = (() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromUrl = urlParams.get('api_key');
+    if (fromUrl) { localStorage.setItem('reminder_api_key', fromUrl); return fromUrl; }
+    return localStorage.getItem('reminder_api_key') || '';
+})();
+function apiHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    if (API_KEY) headers['X-API-Key'] = API_KEY;
+    return headers;
+}
 
 // ─── Clock ───
 function tickClock() {
@@ -930,7 +942,7 @@ setInterval(tickClock, 1000); tickClock();
 // ─── Data Sync ───
 async function sync() {
     try {
-        const res = await fetch('/api/state');
+        const res = await fetch('/api/state', { headers: apiHeaders() });
         S = await res.json();
         if (S.version) document.getElementById('appVersion').textContent = S.version;
         
@@ -1127,7 +1139,7 @@ async function toggleStatus(id, currentStatus) {
     const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
     await fetch(`/api/reminders/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders(),
         body: JSON.stringify({ status: newStatus })
     });
     sync();
@@ -1214,7 +1226,7 @@ function paintData() {
         return;
     }
     logC.innerHTML = logs.map(l => `
-        <div class="log-entry ${hiddenLogs.has(l.id) ? 'hidden-log' : ''}" id="log-${l.id}">
+        <div class="log-entry ${l.hidden ? 'hidden-log' : ''}" id="log-${l.id}">
             <div class="log-icon ${l.completed_at ? 'completed' : 'triggered'}">
                 <i class="fas fa-${l.completed_at ? 'check' : 'bell'}"></i>
             </div>
@@ -1232,10 +1244,11 @@ function paintData() {
 }
 
 // ─── Log Actions ───
-function hideLog(id) {
-    hiddenLogs.add(id);
-    const el = document.getElementById('log-' + id);
-    if (el) el.classList.add('hidden-log');
+async function hideLog(id) {
+    try {
+        await fetch(`/api/logs/hide/${id}`, { method: 'POST', headers: apiHeaders() });
+    } catch(e) { console.error('hideLog failed', e); }
+    sync();
 }
 function reuseLog(title) {
     document.getElementById('f_editId').value = '';
@@ -1246,8 +1259,10 @@ function reuseLog(title) {
 }
 async function deleteLog(id) {
     if (!confirm('确认删除该记录？')) return;
-    S.logs = S.logs.filter(l => l.id !== id);
-    paintData();
+    try {
+        await fetch(`/api/logs/${id}`, { method: 'DELETE', headers: apiHeaders() });
+    } catch(e) { console.error('deleteLog failed', e); }
+    sync();
 }
 
 // ─── Toggle Hidden Logs (需求1-补充) ───
@@ -1297,6 +1312,15 @@ function paintSettings() {
     document.getElementById('w_sms_phone').value = wh.sms_phone || '';
     document.getElementById('w_sms_api').value = wh.sms_api || '';
     document.getElementById('w_voice_api').value = wh.voice_api || '';
+
+    const authStatus = document.getElementById('authStatus');
+    if (authStatus) {
+        if (S.auth_required) {
+            authStatus.innerHTML = '<i class="fas fa-shield-halved" style="color:var(--c-green)"></i> <span style="color:var(--c-green)">API Key 已认证</span>';
+        } else {
+            authStatus.innerHTML = '<i class="fas fa-triangle-exclamation" style="color:var(--c-orange)"></i> <span style="color:var(--c-orange)">API 未认证（公开模式）</span>';
+        }
+    }
 }
 
 // ─── Actions ───
@@ -1304,7 +1328,7 @@ async function doAction(id, type) {
     if (type === 'delete' && !confirm('确认删除该任务？')) return;
     await fetch(`/api/reminders/${id}`, {
         method: type === 'delete' ? 'DELETE' : 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders(),
         body: type === 'toggle' ? JSON.stringify({ status: 'completed' }) : null
     });
     sync();
@@ -1536,14 +1560,14 @@ async function createTask() {
             finalTime = `${dateVal} ${time}`;
         }
     } else if (mode === 'workday') {
-        repeat = 'weekly:mon,tue,wed,thu,fri';
+        repeat = 'workday';
     }
 
     if (editId) {
         // Update existing
         await fetch(`/api/reminders/${editId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: apiHeaders(),
             body: JSON.stringify({ title, time: finalTime, priority: prio, repeat })
         });
         window.newTaskId = editId;
@@ -1551,7 +1575,7 @@ async function createTask() {
         // Create new
         const res = await fetch('/api/reminders', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: apiHeaders(),
             body: JSON.stringify({ title, time: finalTime, priority: prio, repeat, category: 'work' })
         });
         const created = await res.json();
@@ -1572,7 +1596,7 @@ async function createTask() {
 async function saveWebhooks() {
     await fetch('/api/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders(),
         body: JSON.stringify({
             webhooks: {
                 wecom: document.getElementById('w_wecom').value,
@@ -1590,7 +1614,7 @@ async function saveWebhooks() {
 
 function toggleDark() {
     const isDark = document.body.getAttribute('data-theme') !== 'light';
-    fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({dark_mode: !isDark}) });
+    fetch('/api/settings', { method: 'POST', headers: apiHeaders(), body: JSON.stringify({dark_mode: !isDark}) });
     document.body.setAttribute('data-theme', isDark ? 'light' : '');
     document.getElementById('darkToggle').className = 'toggle' + (!isDark ? ' on' : '');
     document.getElementById('darkDesc').textContent = !isDark ? '当前已开启' : '当前已关闭';
@@ -1639,6 +1663,7 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
+        { version: 'v3.2.15', changes: ['代码全面重构：模块化拆分', '修复工作日模式绕过中国法定节假日检查', '短信/电话 Webhook 通知支持', 'API Key 认证中间件', '服务端输入校验', '日志持久化删除', 'XSS 防护增强', '依赖版本锁定与升级'] },
         { version: 'v3.2.14', changes: ['仅一次日期选择范围扩展并限制至2100年', '补充时间和日期未确认时的创建提醒拦截'] },
         { version: 'v3.2.13', changes: ['补充关于页缺失的v3.2.11版本历史'] },
         { version: 'v3.2.12', changes: ['更新企业微信配置说明文案', '补充关于页版本历史展示并保留v3.2.4条目'] },

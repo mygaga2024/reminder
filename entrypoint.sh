@@ -1,49 +1,61 @@
 #!/bin/bash
 set -e
 
-# --- ZSpace Compatibility & Permission Logic ---
 USER_ID=${PUID:-0}
 GROUP_ID=${PGID:-0}
+UMASK_VAL=${UMASK:-000}
 DATA_DIR="/app/data"
 
-echo "==== [Diagnostic] Container Entrypoint Starting ===="
-echo "Target User: UID=$USER_ID, GID=$GROUP_ID"
-echo "Current OS User: $(id)"
+echo "==== Life Reminder Entrypoint ===="
+echo "UID=$USER_ID GID=$GROUP_ID UMASK=$UMASK_VAL"
 
-# Only perform user-switching logic if PUID/PGID are not 0 (root)
-if [ "$USER_ID" -ne 0 ]; then
-    echo "Configuring non-root user: appuser ($USER_ID:$GROUP_ID)"
-    
-    # Create group if it doesn't exist
-    if ! getent group appuser > /dev/null 2>&1; then
-        groupadd -g $GROUP_ID appuser || echo "Warning: groupadd failed, group might already exist."
-    fi
+# ─── Step 1: 设置 umask（NAS Docker 项目通用方案，确保新文件 777 权限） ───
+umask "$UMASK_VAL"
 
-    # Create user if it doesn't exist
-    if ! getent passwd appuser > /dev/null 2>&1; then
-        useradd -u $USER_ID -g $GROUP_ID -m -s /bin/bash appuser || echo "Warning: useradd failed, user might already exist."
-    fi
+# ─── Step 2: 确保数据目录存在并修复权限 ───
+mkdir -p "$DATA_DIR" 2>/dev/null || true
 
-    # Attempt to fix permissions on data directory
-    echo "Applying 'chown' to $DATA_DIR (this may fail on some NAS mounts)..."
-    if ! chown -R appuser:appuser $DATA_DIR 2>/dev/null; then
-        echo "⚠️ Warning: Failed to change ownership of $DATA_DIR."
-        echo "Checking if directory is still writable by UID $USER_ID..."
-    fi
+# 尝试多重权限修复（NAS 上可能静默失败，不影响启动）
+chmod -R 777 "$DATA_DIR" 2>/dev/null || true
+chown -R 0:0 "$DATA_DIR" 2>/dev/null || true
 
-    # Final sanity check: Can the appuser actually touch the volume?
-    if ! su appuser -c "touch $DATA_DIR/.perm_test && rm $DATA_DIR/.perm_test" 2>/dev/null; then
-        echo "❌ CRITICAL ERROR: UID $USER_ID has NO write access to $DATA_DIR."
-        echo "Please check ZSpace NAS folder permissions (合规目录最大读写权限)."
-        echo "Falling back to ROOT to prevent data loss..."
-        exec python reminder.py
+# ─── Step 3: 物理写入测试 ───
+PROBE="$DATA_DIR/.entrypoint_probe_$$"
+if echo "1" > "$PROBE" 2>/dev/null && rm -f "$PROBE" 2>/dev/null; then
+    echo "OK: 数据目录可写 → $DATA_DIR"
+else
+    # 尝试子目录回退
+    if mkdir -p "$DATA_DIR/store" 2>/dev/null && echo "1" > "$DATA_DIR/store/.probe" 2>/dev/null; then
+        rm -f "$DATA_DIR/store/.probe"
+        # 迁移旧数据
+        for f in config.json logs.json; do
+            [ -f "$DATA_DIR/$f" ] && cp "$DATA_DIR/$f" "$DATA_DIR/store/" 2>/dev/null
+        done
+        DATA_DIR="$DATA_DIR/store"
+        echo "OK: 子目录可写 → $DATA_DIR"
     else
-        echo "✅ Persistence Check: UID $USER_ID has write access."
-        exec gosu appuser python reminder.py
+        echo "WARN: 卷不可写，使用容器内部存储"
+        DATA_DIR="/app/internal_data"
+        mkdir -p "$DATA_DIR"
+    fi
+fi
+
+export DATA_DIR
+
+# ─── Step 4: 用户切换 ───
+if [ "$USER_ID" -ne 0 ]; then
+    getent group appuser >/dev/null 2>&1 || groupadd -g "$GROUP_ID" appuser 2>/dev/null || true
+    getent passwd appuser >/dev/null 2>&1 || useradd -u "$USER_ID" -g "$GROUP_ID" -m -s /bin/bash appuser 2>/dev/null || true
+    chown -R appuser:appuser "$DATA_DIR" 2>/dev/null || true
+
+    if su appuser -c "echo 1 > $DATA_DIR/.ptest && rm $DATA_DIR/.ptest" 2>/dev/null; then
+        echo "→ gosu appuser"
+        exec gosu appuser python main.py
+    else
+        echo "→ root（appuser 不可写）"
+        exec python main.py
     fi
 else
-    echo "Running as ROOT (PUID=0). Bypassing user-switch logic."
-    # Even as root, ensure directory exists
-    mkdir -p $DATA_DIR
-    exec python reminder.py
+    echo "→ root"
+    exec python main.py
 fi

@@ -7,20 +7,18 @@ services:
     ports:
       - "35015:5000"
     volumes:
-      # 极空间用户请注意：
-      # 请确保左侧路径 './data' 在极空间文件管理器中已设置为“合规目录最大读写权限”
       - ./data:/app/data
     environment:
       - TZ=Asia/Shanghai
-      # --- 权限配置 (ZSpace 核心设置) ---
-      # 建议初次部署设为 0 (root) 以确保能自动修正权限。
-      # 若需以特定用户运行，请修改为 1000 或极空间对应的 UID/GID。
       - PUID=0
       - PGID=0
+      - UMASK=000
       - APP_PORT=5000
       - DATA_DIR=/app/data
-      # 开启 ZSpace 兼容模式增强诊断
-      - ZSPACE_COMPAT=true
+      # 极空间(ZSpace)用户请取消下面注释
+      # - ZSPACE_COMPAT=true
+      # API Key 认证（可选）
+      # - API_KEY=your-secret-key-here
     logging:
       driver: "json-file"
       options:
