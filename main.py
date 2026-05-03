@@ -50,7 +50,9 @@ app.config['GLOBAL_SCHEDULER'] = scheduler
 
 register_routes(app, db, logs, scheduler)
 
-update_scheduler(scheduler, db, notify_engine)
+# 创建闭包包装 notify_engine，注入 db/logs/scheduler 参数
+_notify_fn = lambda r: notify_engine(r, db, logs, scheduler)
+update_scheduler(scheduler, db, _notify_fn)
 
 if __name__ == "__main__":
     try:
