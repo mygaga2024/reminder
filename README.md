@@ -67,10 +67,35 @@ environment:
 
 ### 极空间 (ZSpace) 部署
 
+极空间 NAS 使用内核级 ACL 限制 Docker 卷写入。启用 `ZSPACE_COMPAT` 后，系统会自动执行以下策略：
+
+1. **umask 000** — 所有新文件获得 777 权限
+2. **子目录回退** — 根挂载点不可写时，自动使用卷内 `store/` 子目录
+3. **三重写入降级** — tempfile → 同名.tmp → 直接覆盖，确保数据落盘
+4. **自动数据迁移** — 切换存储路径时自动迁移已有数据
+
 ```yaml
-environment:
-  - ZSPACE_COMPAT=true   # 启用 ACL 绕过与多重写入降级
+# docker-compose.yaml — 极空间专用
+services:
+  reminder:
+    image: ghcr.io/mygaga2024/reminder:latest
+    container_name: life-reminder
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      # 极空间请使用绝对路径，例如:
+      # /共享文件夹名称/docker/reminder/data:/app/data
+      - ./data:/app/data
+    environment:
+      - TZ=Asia/Shanghai
+      - PUID=0
+      - PGID=0
+      - UMASK=000
+      - ZSPACE_COMPAT=true
 ```
+
+> 极空间用户请注意：在文件管理器中，右键映射目录 →「属性」→「权限设置」→ 勾选「合规目录最大读写权限」。
 
 ## 使用指南
 
