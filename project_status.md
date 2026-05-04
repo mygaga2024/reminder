@@ -139,9 +139,9 @@ python3 -m pytest tests/ -v               # 运行测试
 
 ## 11. 代码同步状态
 
-| 位置 | 版本 | 说明 |
-|---|---|---|
-| 本地 (macOS) | v3.2.15 | 开发主分支 |
-| GitHub (ghcr.io) | v3.2.14 | 待推送 v3.2.15 |
-| 绿联 NAS | v3.2.14 | 生产运行 `ghcr.io/mygaga2024/reminder:latest` |
-| 极空间 | — | 待适配部署 |
+| 位置 | 版本 | Commit | 说明 |
+|---|---|---|---|---|
+| 本地 (macOS) | v3.2.15 | `2c8e06f` | 开发主分支 |
+| GitHub | v3.2.15 | `2c8e06f` | `ghcr.io/mygaga2024/reminder:latest` |
+| 绿联 NAS | v3.2.15 | `2c8e06f` | 生产运行，6 调度任务正常 |
+| 极空间 | v3.2.15 | — | 适配方案已完成，待部署验证 |
