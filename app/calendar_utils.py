@@ -2,6 +2,27 @@ import datetime
 from app.config import CHINESE_CALENDAR_AVAILABLE, chinese_calendar
 
 
+def check_calendar_coverage() -> str:
+    """启动时检查假期库覆盖年份，返回状态字符串"""
+    if not CHINESE_CALENDAR_AVAILABLE:
+        return "未安装"
+
+    this_year = datetime.date.today().year
+    next_year = this_year + 1
+
+    try:
+        chinese_calendar.is_workday(datetime.date(this_year, 1, 1))
+    except NotImplementedError:
+        return f"不支持 {this_year} 年"
+
+    try:
+        chinese_calendar.is_workday(datetime.date(next_year, 1, 1))
+    except NotImplementedError:
+        return f"支持 {this_year} 年，{next_year} 年数据缺失"
+
+    return f"支持 {this_year}-{next_year} 年"
+
+
 def is_china_workday(check_date: datetime.date = None) -> bool:
     """检查指定日期是否为工作日（考虑中国法定节假日）"""
     if check_date is None:

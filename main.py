@@ -11,6 +11,7 @@ from app.config import (
 from app.persistence import run_health_check, load_json, save_json, init_db
 from app.scheduler import update_scheduler
 from app.notifier import notify_engine
+from app.calendar_utils import check_calendar_coverage
 from app.api import register_routes
 
 run_health_check()
@@ -37,6 +38,11 @@ if API_KEY:
     logger.info("API Key 认证: 已启用")
 else:
     logger.warning("API Key 认证: 未启用（建议设置 API_KEY 环境变量）")
+cal_coverage = check_calendar_coverage()
+if "缺失" in cal_coverage or "不支持" in cal_coverage or "未安装" in cal_coverage:
+    logger.warning(f"中国节假日库: {cal_coverage}")
+else:
+    logger.info(f"中国节假日库: {cal_coverage}")
 logger.info("=====================")
 
 app = Flask(__name__)

@@ -42,6 +42,42 @@ fi
 
 export DATA_DIR
 
+# ─── Step 3.5: 节假日库自动升级 ───
+CURRENT_YEAR=$(date +%Y)
+NEXT_YEAR=$((CURRENT_YEAR + 1))
+CAL_CHECK=$(python3 -c "
+try:
+    from chinese_calendar import is_workday
+    from datetime import date
+    r = is_workday(date($CURRENT_YEAR, 6, 1))
+    print('OK')
+except NotImplementedError:
+    print('OUTDATED')
+except ImportError:
+    print('MISSING')
+" 2>/dev/null || echo "ERROR")
+if [ "$CAL_CHECK" = "OUTDATED" ]; then
+    echo "WARN: chinese_calendar 数据未覆盖 $CURRENT_YEAR 年，尝试自动升级..."
+    pip install --upgrade chinese-calendar 2>&1 | tail -1
+    CAL_CHECK2=$(python3 -c "
+try:
+    from chinese_calendar import is_workday
+    from datetime import date
+    r = is_workday(date($CURRENT_YEAR, 6, 1))
+    print('OK')
+except NotImplementedError:
+    print('STILL_OUTDATED')
+" 2>/dev/null || echo "ERROR")
+    if [ "$CAL_CHECK2" = "OK" ]; then
+        echo "OK: 节假日库自动升级成功，已覆盖 $CURRENT_YEAR 年"
+    else
+        echo "WARN: 自动升级未解决，$CURRENT_YEAR 年节假日判断将回退到简单工作日模式"
+    fi
+elif [ "$CAL_CHECK" = "MISSING" ]; then
+    echo "WARN: chinese_calendar 未安装，尝试安装..."
+    pip install chinese-calendar 2>&1 | tail -1
+fi
+
 # ─── Step 4: 用户切换 ───
 if [ "$USER_ID" -ne 0 ]; then
     getent group appuser >/dev/null 2>&1 || groupadd -g "$GROUP_ID" appuser 2>/dev/null || true
