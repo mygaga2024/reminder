@@ -18,13 +18,13 @@ reminder_history.json
 .DS_Store
 
 # Local protocol (not for git)
-code_protocol.md
-.code_protocol.md
+developer_rules.md
 DEVELOPMENT_PROTOCOL.md
 reminder_运维手册.md
 AGENTS.md
 project_status.md
 test_persistence.py
+scripts/.nas_ssh*
 
 # Node.js (for miniapp, currently paused)
 package-lock.json
