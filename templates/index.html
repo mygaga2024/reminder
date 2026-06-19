@@ -730,7 +730,7 @@ input, select, button, textarea { font-family: inherit; }
 
             <div class="footer-info">
                 <span id="authStatus"></span><br>
-                Life Reminder v<span id="appVersion">3.2.17</span><br>
+                Life Reminder v<span id="appVersion">3.2.18</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -1695,6 +1695,7 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
+        { version: 'v3.2.18', changes: ['节假日库启动年检 + 容器自动升级', 'chinese_calendar 升级至 >=1.11.0，支持 2026 年'] },
         { version: 'v3.2.17', changes: ['升级 chinese_calendar 至 >=1.11.0，支持 2026 年中国法定节假日'] },
         { version: 'v3.2.16', changes: ['一键清空已完成任务（含关联日志清理）', '修复切换完成状态验证失败', '按钮移至数据页通知记录右侧'] },
         { version: 'v3.2.15', changes: ['代码全面重构：模块化拆分', '修复工作日模式绕过中国法定节假日检查', '短信/电话 Webhook 通知支持', 'API Key 认证中间件', '服务端输入校验', '日志持久化删除', 'XSS 防护增强', '依赖版本锁定与升级'] },
