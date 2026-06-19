@@ -12,7 +12,13 @@ def is_china_workday(check_date: datetime.date = None) -> bool:
 
     try:
         return chinese_calendar.is_workday(check_date)
+    except NotImplementedError:
+        from app.config import logger
+        logger.warning(f"chinese_calendar 数据未覆盖 {check_date.year} 年，回退到简单工作日判断")
+        return check_date.weekday() < 5
     except Exception:
+        from app.config import logger
+        logger.warning(f"chinese_calendar 调用失败，回退到简单工作日判断")
         return check_date.weekday() < 5
 
 
