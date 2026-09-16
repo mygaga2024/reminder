@@ -241,6 +241,51 @@ class TestValidation:
         })
         assert resp.status_code == 200
 
+    def test_yearly_requires_date(self, client):
+        resp = client.post('/api/reminders', json={
+            "title": "没有日期的每年提醒", "time": "09:00", "repeat": "yearly"
+        })
+        assert resp.status_code == 400
+        assert "每年" in resp.get_json()["error"]
+
+    def test_yearly_with_date_accepted(self, client):
+        resp = client.post('/api/reminders', json={
+            "title": "每年生日", "time": "2026-09-09 06:28", "repeat": "yearly"
+        })
+        assert resp.status_code == 200
+
+    def test_monthly_valid_and_invalid_day(self, client):
+        ok = client.post('/api/reminders', json={
+            "title": "每月15号", "time": "09:00", "repeat": "monthly:15"
+        })
+        assert ok.status_code == 200
+        last = client.post('/api/reminders', json={
+            "title": "每月最后一天", "time": "09:00", "repeat": "monthly:last"
+        })
+        assert last.status_code == 200
+        bad = client.post('/api/reminders', json={
+            "title": "每月32号", "time": "09:00", "repeat": "monthly:32"
+        })
+        assert bad.status_code == 400
+        bad_format = client.post('/api/reminders', json={
+            "title": "每月乱填", "time": "09:00", "repeat": "monthly:abc"
+        })
+        assert bad_format.status_code == 400
+
+    def test_lunar_repeat_validation(self, client):
+        ok = client.post('/api/reminders', json={
+            "title": "农历八月十五", "time": "09:00", "repeat": "lunar:08-15"
+        })
+        assert ok.status_code == 200
+        leap = client.post('/api/reminders', json={
+            "title": "闰六月初一", "time": "09:00", "repeat": "lunar:-06-01"
+        })
+        assert leap.status_code == 200
+        bad = client.post('/api/reminders', json={
+            "title": "非法农历", "time": "09:00", "repeat": "lunar:13-01"
+        })
+        assert bad.status_code == 400
+
 
 class TestAuth:
     @patch('app.auth.API_KEY', 'test-key-123')

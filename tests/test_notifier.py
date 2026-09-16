@@ -6,9 +6,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import datetime
 from unittest.mock import MagicMock, patch, call
 from app.notifier import notify_engine, _send_generic_webhook
-from app.notifier import _prune_logs
+from app.notifier import _prune_logs, _repeat_label
 from app.calendar_utils import is_china_workday
 from app.config import TZ_ENV
+from app import lunar_utils
 
 
 class TestNotifyEngine:
@@ -203,6 +204,82 @@ class TestMultiAccountNotify:
         assert db["users"]["alice"]["reminders"] == []
         assert db["reminders"] == []
         scheduler.remove_job.assert_called_once_with("reminder-alice-1")
+
+
+class TestRepeatLabel:
+    """通知消息里的重复类型文案（历史实现对 weekly 会误显示为每天）"""
+
+    def test_label_mapping(self):
+        assert _repeat_label("daily") == "每天"
+        assert _repeat_label("workday") == "工作日"
+        assert _repeat_label("once") == "一次性"
+        assert _repeat_label("yearly") == "每年"
+        assert _repeat_label("weekly:mon,wed") == "每周"
+        assert _repeat_label("monthly:15") == "每月15日"
+        assert _repeat_label("monthly:last") == "每月最后一天"
+        assert _repeat_label("lunar:08-15") == "每年（农历八月十五）"
+
+    def make_db(self):
+        return {
+            "settings": {"webhooks": {"wecom": "https://qyapi.weixin.qq.com/test"}},
+            "reminders": [],
+            "users": {}
+        }
+
+    @patch('app.notifier.requests.post')
+    def capture_message(self, mock_post, repeat):
+        mock_post.return_value.status_code = 200
+        notify_engine(
+            {"id": "r1", "title": "文案测试", "time": "10:00", "repeat": repeat},
+            self.make_db(), [], MagicMock()
+        )
+        return mock_post.call_args[1]["json"]["text"]["content"]
+
+    def test_weekly_label(self):
+        assert "重复类型：每周" in self.capture_message(repeat="weekly:mon,wed")
+
+    def test_monthly_label(self):
+        assert "重复类型：每月15日" in self.capture_message(repeat="monthly:15")
+        assert "重复类型：每月最后一天" in self.capture_message(repeat="monthly:last")
+
+    def test_yearly_label(self):
+        assert "重复类型：每年" in self.capture_message(repeat="yearly")
+
+
+class TestLunarNotify:
+    """农历纪念日只在当天推送"""
+
+    def make_db(self):
+        return {"settings": {"webhooks": {}}, "reminders": [], "users": {}}
+
+    def test_fires_on_lunar_anniversary(self):
+        if not lunar_utils.LUNAR_AVAILABLE:
+            pytest.skip("未安装 lunar_python")
+        month, day = lunar_utils.solar_to_lunar(datetime.date.today())
+        reminder = {
+            "id": "r1", "title": "农历今天", "time": "10:00",
+            "repeat": lunar_utils.build_lunar_repeat(month, day)
+        }
+        logs = []
+
+        notify_engine(reminder, self.make_db(), logs, MagicMock())
+
+        assert len(logs) == 1
+
+    def test_skipped_on_other_days(self):
+        if not lunar_utils.LUNAR_AVAILABLE:
+            pytest.skip("未安装 lunar_python")
+        month, day = lunar_utils.solar_to_lunar(datetime.date.today())
+        other_day = 2 if day == 1 else 1
+        reminder = {
+            "id": "r1", "title": "农历非今天", "time": "10:00",
+            "repeat": lunar_utils.build_lunar_repeat(month, other_day)
+        }
+        logs = []
+
+        notify_engine(reminder, self.make_db(), logs, MagicMock())
+
+        assert logs == []
 
 
 class TestLogRetention:

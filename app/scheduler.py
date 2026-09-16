@@ -7,6 +7,7 @@ from app.config import (
     DATETIME_PATTERN, TIME_PATTERN
 )
 from app.persistence import db_lock
+from app import lunar_utils
 
 
 def update_scheduler(scheduler: BackgroundScheduler, db: dict, notify_fn) -> None:
@@ -60,6 +61,12 @@ def _build_trigger(t_str: str, rep: str):
     try:
         if DATETIME_PATTERN.match(t_str):
             target_dt = datetime.datetime.strptime(t_str, '%Y-%m-%d %H:%M')
+            if rep == "yearly":
+                # 每年模式：日期仅用于提供月/日，过期年份不影响后续年度触发
+                return CronTrigger(
+                    month=target_dt.month, day=target_dt.day,
+                    hour=target_dt.hour, minute=target_dt.minute
+                )
             target_dt = target_dt.replace(tzinfo=TZ_ENV)
             if target_dt <= datetime.datetime.now(TZ_ENV):
                 target_dt += datetime.timedelta(days=1)
@@ -79,6 +86,14 @@ def _build_trigger(t_str: str, rep: str):
                 return CronTrigger(day_of_week=days, hour=h, minute=m)
             elif rep == "workday":
                 return CronTrigger(hour=h, minute=m, day_of_week='mon-fri')
+            elif rep.startswith("monthly:"):
+                day_expr = rep.split(":", 1)[1]
+                if day_expr == "last":
+                    return CronTrigger(day="last", hour=h, minute=m)
+                return CronTrigger(day=day_expr, hour=h, minute=m)
+            elif rep.startswith("lunar:"):
+                # 农历每年：每天同一时刻触发，由 notifier 判断当天是否为农历纪念日
+                return CronTrigger(hour=h, minute=m)
             else:
                 target_datetime = datetime.datetime.combine(
                     datetime.date.today(), datetime.time(hour_val, minute_val)

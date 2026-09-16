@@ -3,7 +3,7 @@ import re
 import logging
 import zoneinfo
 
-VERSION = "3.2.25"
+VERSION = "3.2.26"
 
 DATETIME_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$')
 TIME_PATTERN = re.compile(r'^\d{1,2}:\d{2}$')
@@ -11,7 +11,7 @@ TIME_PATTERN = re.compile(r'^\d{1,2}:\d{2}$')
 TITLE_MAX_LENGTH = 200
 TIME_MAX_LENGTH = 50
 WEBHOOK_URL_MAX_LENGTH = 500
-VALID_REPEAT_MODES = {"none", "once", "daily", "workday"}
+VALID_REPEAT_MODES = {"none", "once", "daily", "workday", "yearly", "monthly"}
 VALID_PRIORITIES = {"low", "mid", "high"}
 
 TIPS_LIST = [

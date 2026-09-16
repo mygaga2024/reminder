@@ -7,6 +7,7 @@ from app.config import API_KEY, VALID_REPEAT_MODES, VALID_PRIORITIES
 from app.config import TITLE_MAX_LENGTH, TIME_MAX_LENGTH, WEBHOOK_URL_MAX_LENGTH
 from app.config import DATETIME_PATTERN, TIME_PATTERN
 from app import users
+from app import lunar_utils
 
 SESSION_HEADER = "X-Auth-Token"
 
@@ -73,6 +74,16 @@ def validate_reminder_input(data: dict) -> list:
         valid_days = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
         if not days or not all(d in valid_days for d in days):
             errors.append("每周重复的星期格式无效")
+    elif repeat.startswith("monthly:"):
+        errors.extend(validate_monthly_repeat(repeat))
+    elif repeat.startswith("lunar:"):
+        if lunar_utils.parse_lunar_repeat(repeat) is None:
+            errors.append("农历日期格式无效，应为 lunar:MM-DD")
+        elif not lunar_utils.LUNAR_AVAILABLE:
+            errors.append("服务端未安装农历组件，暂时无法创建农历提醒")
+    elif repeat == "yearly":
+        if not DATETIME_PATTERN.match(time_val):
+            errors.append("每年提醒需要选择具体日期（月/日）")
     elif repeat not in VALID_REPEAT_MODES:
         errors.append(f"重复模式无效，允许的值: {', '.join(VALID_REPEAT_MODES)}")
 
@@ -81,6 +92,20 @@ def validate_reminder_input(data: dict) -> list:
         errors.append(f"优先级无效，允许的值: {', '.join(VALID_PRIORITIES)}")
 
     return errors
+
+
+def validate_monthly_repeat(repeat: str) -> list:
+    """校验 monthly:DD / monthly:last 重复模式"""
+    day_expr = repeat.split(":", 1)[1] if ":" in repeat else ""
+    if day_expr == "last":
+        return []
+    try:
+        day_val = int(day_expr)
+    except (ValueError, TypeError, OverflowError):
+        return ["每月提醒的日期无效，应为 1-31 或 last"]
+    if not 1 <= day_val <= 31:
+        return ["每月提醒的日期无效，应为 1-31 或 last"]
+    return []
 
 
 def validate_time_value(time_val: str) -> list:

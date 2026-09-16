@@ -7,6 +7,22 @@ from app.config import LOGS_FILE, CONFIG_FILE
 from app.calendar_utils import is_china_workday
 from app.persistence import save_json, db_lock
 from app import users
+from app import lunar_utils
+
+
+def _repeat_label(rep: str) -> str:
+    """重复模式中文标签（含每周/每月/每年/农历，历史实现对 weekly 会误显示为每天）"""
+    lunar_spec = lunar_utils.parse_lunar_repeat(rep)
+    if lunar_spec:
+        return f"每年（农历{lunar_utils.lunar_label(*lunar_spec)}）"
+    if rep.startswith("monthly:"):
+        day_expr = rep.split(":", 1)[1]
+        return "每月最后一天" if day_expr == "last" else f"每月{day_expr}日"
+    if rep == "yearly":
+        return "每年"
+    if rep.startswith("weekly:"):
+        return "每周"
+    return {"once": "一次性", "daily": "每天", "workday": "工作日"}.get(rep, "每天")
 
 
 def _parse_triggered_at(value):
@@ -45,6 +61,17 @@ def notify_engine(reminder: dict, db: dict, logs: list, scheduler=None) -> None:
                     logger.info(f"工作日任务跳过（非法定工作日）: {reminder.get('title')} - {today}")
                     return
 
+            # 农历每年：仅在当天为该农历日期时推送（闰月需月份一致）
+            lunar_spec = lunar_utils.parse_lunar_repeat(rep)
+            if lunar_spec:
+                today = datetime.date.today()
+                if not lunar_utils.is_lunar_anniversary(today, lunar_spec[0], lunar_spec[1]):
+                    logger.info(
+                        f"农历纪念日跳过（今天非农历{lunar_utils.lunar_label(*lunar_spec)}）: "
+                        f"{reminder.get('title')} - {today}"
+                    )
+                    return
+
             # 多账号：Webhook 配置取自提醒归属账号，开放模式回落顶层设置
             s = users.owned_settings(db, reminder)
             title = reminder.get("title", "未命名提醒")
@@ -54,7 +81,7 @@ def notify_engine(reminder: dict, db: dict, logs: list, scheduler=None) -> None:
 
             tip = random.choice(TIPS_LIST)
 
-            rep_label = {"once": "一次性", "daily": "每天", "weekly": "每周", "workday": "工作日"}.get(rep, "每天")
+            rep_label = _repeat_label(rep)
             msg = f"""\u23f0 您有一个提醒！
 
 \U0001f4dd 提醒内容：{title}

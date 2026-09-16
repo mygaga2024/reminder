@@ -66,6 +66,42 @@ class TestBuildTrigger:
         assert isinstance(trigger, DateTrigger)
         assert trigger.run_date.strftime("%Y-%m-%d %H:%M") == "2099-01-02 08:15"
 
+    def test_yearly_uses_month_day_cron(self):
+        trigger = _build_trigger("2026-09-09 06:28", "yearly")
+        assert isinstance(trigger, CronTrigger)
+        fields = {f.name: str(f) for f in trigger.fields}
+        assert fields["month"] == "9"
+        assert fields["day"] == "9"
+        assert fields["hour"] == "6"
+        assert fields["minute"] == "28"
+
+    def test_yearly_past_date_still_repeats(self):
+        """每年模式只看月/日，过去的年份不应影响触发"""
+        trigger = _build_trigger("2020-01-02 08:15", "yearly")
+        assert isinstance(trigger, CronTrigger)
+        fields = {f.name: str(f) for f in trigger.fields}
+        assert fields["month"] == "1" and fields["day"] == "2"
+
+    def test_monthly_specific_day(self):
+        trigger = _build_trigger("09:00", "monthly:15")
+        assert isinstance(trigger, CronTrigger)
+        fields = {f.name: str(f) for f in trigger.fields}
+        assert fields["day"] == "15"
+
+    def test_monthly_last_day(self):
+        trigger = _build_trigger("09:00", "monthly:last")
+        assert isinstance(trigger, CronTrigger)
+        fields = {f.name: str(f) for f in trigger.fields}
+        assert "last" in fields["day"]
+
+    def test_lunar_repeats_daily_for_anniversary_check(self):
+        """农历每年：每天同一时刻触发，由通知引擎判断当天是否为农历纪念日"""
+        trigger = _build_trigger("09:00", "lunar:08-15")
+        assert isinstance(trigger, CronTrigger)
+        fields = {f.name: str(f) for f in trigger.fields}
+        assert fields["day"] == "*"
+        assert fields["hour"] == "9" and fields["minute"] == "0"
+
     def test_once_with_past_datetime_shifts_one_day(self):
         trigger = _build_trigger("2020-01-02 08:15", "once")
         assert isinstance(trigger, DateTrigger)

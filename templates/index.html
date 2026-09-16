@@ -992,7 +992,7 @@ input, select, button, textarea { font-family: inherit; }
 
             <div class="footer-info">
                 <span id="authStatus"></span>
-                Life Reminder v<span id="appVersion">3.2.25</span><br>
+                Life Reminder v<span id="appVersion">3.2.26</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -1087,8 +1087,15 @@ input, select, button, textarea { font-family: inherit; }
                 <div class="chip active" data-val="daily" onclick="pickRepeat(this)">每天</div>
                 <div class="chip" data-val="workday" onclick="pickRepeat(this)">工作日</div>
                 <div class="chip" data-val="weekly" onclick="pickRepeat(this)">自选星期</div>
+                <div class="chip" data-val="monthly" onclick="pickRepeat(this)">每月</div>
+                <div class="chip" data-val="yearly" onclick="pickRepeat(this)">每年</div>
+                <div class="chip" data-val="lunar" onclick="pickRepeat(this)">农历每年</div>
                 <div class="chip" data-val="once" onclick="pickRepeat(this)">仅一次</div>
             </div>
+        </div>
+        <div class="field" id="monthdayField" style="display:none">
+            <label>每月的第几天</label>
+            <select id="f_monthday"></select>
         </div>
         <div class="field" id="weekdayField" style="display:none">
             <label>选择星期（可多选）</label>
@@ -1602,6 +1609,15 @@ function paintHome() {
         if (rep === 'daily') return '每天';
         if (rep === 'workday') return '工作日';
         if (rep === 'once') return '仅一次';
+        if (rep === 'yearly') return '每年';
+        if (rep.startsWith('monthly:')) {
+            const dayExpr = rep.split(':')[1];
+            return dayExpr === 'last' ? '每月最后一天' : `每月${Number(dayExpr)}日`;
+        }
+        if (rep.startsWith('lunar:')) {
+            const label = lunarLabelFromRepeat(rep);
+            return label ? `每年农历${label}` : '每年农历';
+        }
         if (rep.startsWith('weekly:')) return '每周' + rep.split(':')[1].split(',').map(d => ({mon:'一',tue:'二',wed:'三',thu:'四',fri:'五',sat:'六',sun:'日'}[d]||d)).join('、');
         return rep;
     }
@@ -1771,12 +1787,46 @@ function editTask(id) {
     // Restore repeat mode
     const rep = r.repeat || 'daily';
     document.querySelectorAll('#repeatMode .chip').forEach(c => c.classList.remove('active'));
-    if (rep === 'daily' || rep === 'workday' || rep === 'once') {
+    const existingDate = r.time.includes(' ') ? r.time.split(' ')[0] : '';
+
+    if (rep.startsWith('lunar:')) {
+        document.querySelector('#repeatMode .chip[data-val="lunar"]').classList.add('active');
+        const lunarDate = solarDateFromLunarRepeat(rep);
+        const label = lunarLabelFromRepeat(rep);
+        document.getElementById('weekdayField').style.display = 'none';
+        document.getElementById('monthdayField').style.display = 'none';
+        document.getElementById('dateField').style.display = 'block';
+        document.getElementById('f_date').value = lunarDate;
+        document.getElementById('dateFieldLabel').textContent = '提醒日期';
+        document.getElementById('calendarPicker').style.display = 'none';
+        document.getElementById('dateValStr').textContent = label ? `农历${label}` : lunarDate;
+        document.getElementById('selectedDateDisplay').style.display = 'flex';
+    } else if (rep === 'yearly') {
+        document.querySelector('#repeatMode .chip[data-val="yearly"]').classList.add('active');
+        document.getElementById('weekdayField').style.display = 'none';
+        document.getElementById('monthdayField').style.display = 'none';
+        document.getElementById('dateField').style.display = 'block';
+        document.getElementById('f_date').value = existingDate;
+        document.getElementById('dateFieldLabel').textContent = '提醒日期';
+        document.getElementById('calendarPicker').style.display = 'none';
+        document.getElementById('dateValStr').textContent = existingDate
+            ? `${existingDate} · 每年 ${Number(existingDate.slice(5, 7))} 月 ${Number(existingDate.slice(8, 10))} 日`
+            : '';
+        document.getElementById('selectedDateDisplay').style.display = 'flex';
+    } else if (rep.startsWith('monthly:')) {
+        document.querySelector('#repeatMode .chip[data-val="monthly"]').classList.add('active');
+        initMonthdayOptions();
+        document.getElementById('f_monthday').value = rep.split(':')[1] || '1';
+        document.getElementById('weekdayField').style.display = 'none';
+        document.getElementById('dateField').style.display = 'none';
+        document.getElementById('monthdayField').style.display = 'block';
+    } else if (rep === 'daily' || rep === 'workday' || rep === 'once') {
         document.querySelector(`#repeatMode .chip[data-val="${rep}"]`).classList.add('active');
         document.getElementById('weekdayField').style.display = 'none';
+        document.getElementById('monthdayField').style.display = 'none';
         document.getElementById('dateField').style.display = rep === 'once' ? 'block' : 'none';
         if (rep === 'once') {
-            document.getElementById('f_date').value = r.time.split(' ')[0] || '';
+            document.getElementById('f_date').value = existingDate;
             document.getElementById('dateFieldLabel').textContent = '提醒日期';
             document.getElementById('calendarPicker').style.display = 'none';
             document.getElementById('dateValStr').textContent = document.getElementById('f_date').value;
@@ -1786,6 +1836,7 @@ function editTask(id) {
         document.querySelector('#repeatMode .chip[data-val="weekly"]').classList.add('active');
         document.getElementById('weekdayField').style.display = 'block';
         document.getElementById('dateField').style.display = 'none';
+        document.getElementById('monthdayField').style.display = 'none';
         const days = rep.split(':')[1].split(',');
         document.querySelectorAll('#weekdayPicker .chip').forEach(c => {
             c.classList.toggle('active', days.includes(c.dataset.val));
@@ -2031,14 +2082,69 @@ function pickRepeat(el) {
     el.parentElement.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
     el.classList.add('active');
     const val = el.dataset.val;
+    const needDate = val === 'once' || val === 'yearly' || val === 'lunar';
+    // 每年/农历每年只需月日，允许选择过去的日期
+    calAllowPast = (val === 'yearly' || val === 'lunar');
     document.getElementById('weekdayField').style.display = val === 'weekly' ? 'block' : 'none';
-    document.getElementById('dateField').style.display = val === 'once' ? 'block' : 'none';
-    if (val === 'once') {
-        document.getElementById('dateFieldLabel').textContent = '选择日期';
+    document.getElementById('monthdayField').style.display = val === 'monthly' ? 'block' : 'none';
+    document.getElementById('dateField').style.display = needDate ? 'block' : 'none';
+    if (val === 'monthly') initMonthdayOptions();
+    if (needDate) {
+        document.getElementById('dateFieldLabel').textContent =
+            val === 'once' ? '选择日期'
+                : (val === 'lunar' ? '选择农历日期（按农历月/日重复）' : '选择日期（每年按该月/日提醒）');
         document.getElementById('calendarPicker').style.display = 'block';
         document.getElementById('selectedDateDisplay').style.display = 'none';
         renderCalendar();
     }
+}
+
+// ─── 农历 / 每月 辅助 ───
+function initMonthdayOptions() {
+    const sel = document.getElementById('f_monthday');
+    if (sel.options.length > 0) return;
+    for (let d = 1; d <= 31; d++) {
+        sel.innerHTML += `<option value="${d}">${d} 日</option>`;
+    }
+    sel.innerHTML += '<option value="last">最后一天</option>';
+}
+
+function lunarInfoFromDate(dateStr) {
+    if (typeof Lunar === 'undefined' || !dateStr) return null;
+    const parts = dateStr.split('-').map(Number);
+    if (parts.length !== 3 || parts.some(isNaN)) return null;
+    const lunar = Lunar.fromDate(new Date(parts[0], parts[1] - 1, parts[2]));
+    return {
+        month: lunar.getMonth(),
+        day: lunar.getDay(),
+        label: (lunar.getMonth() < 0 ? '闰' : '') + lunar.getMonthInChinese() + '月' + lunar.getDayInChinese()
+    };
+}
+
+function lunarRepeatFromDate(dateStr) {
+    const info = lunarInfoFromDate(dateStr);
+    if (!info) return null;
+    const mm = String(Math.abs(info.month)).padStart(2, '0');
+    const dd = String(info.day).padStart(2, '0');
+    return info.month < 0 ? `lunar:-${mm}-${dd}` : `lunar:${mm}-${dd}`;
+}
+
+function lunarLabelFromRepeat(rep) {
+    const matched = /^lunar:(-?\d{1,2})-(\d{1,2})$/.exec(rep || '');
+    if (!matched || typeof Lunar === 'undefined') return '';
+    const month = parseInt(matched[1], 10);
+    const day = parseInt(matched[2], 10);
+    const lunar = Lunar.fromYmd(new Date().getFullYear(), month, day);
+    return (month < 0 ? '闰' : '') + lunar.getMonthInChinese() + '月' + lunar.getDayInChinese();
+}
+
+function solarDateFromLunarRepeat(rep) {
+    const matched = /^lunar:(-?\d{1,2})-(\d{1,2})$/.exec(rep || '');
+    if (!matched || typeof Lunar === 'undefined') return '';
+    const month = parseInt(matched[1], 10);
+    const day = parseInt(matched[2], 10);
+    const solar = Lunar.fromYmd(new Date().getFullYear(), month, day).getSolar();
+    return `${solar.getYear()}-${String(solar.getMonth()).padStart(2, '0')}-${String(solar.getDay()).padStart(2, '0')}`;
 }
 
 // ─── Time Picker (需求1，2) ───
@@ -2076,6 +2182,7 @@ function confirmTime() {
 
 // ─── Calendar Picker (需求3) ───
 let calYear, calMonth, calSelectedDate = null;
+let calAllowPast = false;   // 每年/农历每年模式只需月日，允许选择过去的日期
 
 function renderYearPicker() {
     const container = document.getElementById('calendarPicker');
@@ -2149,7 +2256,7 @@ function renderCalendar(y, m) {
         const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const isToday = dObj.getTime() === today.getTime();
         const isSelected = dateStr === calSelectedDate;
-        const isPast = dObj < today;
+        const isPast = !calAllowPast && dObj < today;
         
         let relLabel = "";
         if (isToday) relLabel = "今天";
@@ -2194,6 +2301,7 @@ function selectCalDay(dateStr) {
 }
 function cancelCalendar() {
     calSelectedDate = null;
+    calAllowPast = false;
     document.getElementById('f_date').value = '';
     showToast('已取消', 'times-circle', '#ff9f0a');
     // Switch back to daily
@@ -2206,7 +2314,15 @@ function confirmCalendar() {
     document.getElementById('f_date').value = calSelectedDate;
     document.getElementById('calendarPicker').style.display = 'none';
     document.getElementById('dateFieldLabel').textContent = '提醒日期';
-    document.getElementById('dateValStr').textContent = calSelectedDate;
+    const mode = document.querySelector('#repeatMode .active').dataset.val;
+    let labelText = calSelectedDate;
+    if (mode === 'lunar') {
+        const info = lunarInfoFromDate(calSelectedDate);
+        if (info) labelText = `${calSelectedDate} · 农历${info.label}`;
+    } else if (mode === 'yearly') {
+        labelText = `${calSelectedDate} · 每年 ${Number(calSelectedDate.slice(5, 7))} 月 ${Number(calSelectedDate.slice(8, 10))} 日`;
+    }
+    document.getElementById('dateValStr').textContent = labelText;
     document.getElementById('selectedDateDisplay').style.display = 'flex';
 }
 
@@ -2242,6 +2358,30 @@ async function createTask() {
     if (mode === 'weekly') {
         const days = Array.from(document.querySelectorAll('#weekdayPicker .active')).map(c => c.dataset.val);
         repeat = days.length > 0 ? 'weekly:' + days.join(',') : 'daily';
+    } else if (mode === 'monthly') {
+        initMonthdayOptions();
+        repeat = 'monthly:' + (document.getElementById('f_monthday').value || '1');
+    } else if (mode === 'yearly' || mode === 'lunar') {
+        const dateVal = document.getElementById('f_date').value;
+        if (document.getElementById('calendarPicker').style.display === 'block' && calSelectedDate && calSelectedDate !== dateVal) {
+            showToast('请先点击日期选择器底部的“确定”按钮', 'triangle-exclamation', '#ff9f0a');
+            return;
+        }
+        if (!dateVal) {
+            showToast('请选择日期', 'triangle-exclamation', '#ff9f0a');
+            return;
+        }
+        if (mode === 'yearly') {
+            // 每年：日期仅用于提供月/日
+            finalTime = `${dateVal} ${time}`;
+        } else {
+            const lunarRepeat = lunarRepeatFromDate(dateVal);
+            if (!lunarRepeat) {
+                showToast('农历换算失败，请重新选择日期', 'times-circle', 'var(--c-red)');
+                return;
+            }
+            repeat = lunarRepeat;
+        }
     } else if (mode === 'once') {
         const dateVal = document.getElementById('f_date').value;
         if (document.getElementById('calendarPicker').style.display === 'block' && calSelectedDate && calSelectedDate !== dateVal) {
@@ -2257,11 +2397,16 @@ async function createTask() {
 
     if (editId) {
         // Update existing
-        await fetch(`/api/reminders/${editId}`, {
+        const res = await fetch(`/api/reminders/${editId}`, {
             method: 'PUT',
             headers: apiHeaders(),
             body: JSON.stringify({ title, time: finalTime, priority: prio, repeat })
         });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            showToast(data.error || '保存失败，请检查输入', 'times-circle', 'var(--c-red)');
+            return;
+        }
         window.newTaskId = editId;
     } else {
         // Create new
@@ -2270,6 +2415,11 @@ async function createTask() {
             headers: apiHeaders(),
             body: JSON.stringify({ title, time: finalTime, priority: prio, repeat })
         });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            showToast(data.error || '创建失败，请检查输入', 'times-circle', 'var(--c-red)');
+            return;
+        }
         const created = await res.json();
         window.newTaskId = created.id;
     }
@@ -2344,7 +2494,9 @@ function openSheet(id) {
         document.querySelectorAll('#repeatMode .chip').forEach(c => c.classList.remove('active'));
         document.querySelector('#repeatMode .chip[data-val="daily"]').classList.add('active');
         document.getElementById('weekdayField').style.display = 'none';
+        document.getElementById('monthdayField').style.display = 'none';
         document.getElementById('dateField').style.display = 'none';
+        calAllowPast = false;
         document.querySelectorAll('#weekdayPicker .chip').forEach(c => c.classList.remove('active'));
         document.getElementById('timePickerBox').style.display = 'none';
     }
@@ -2367,6 +2519,7 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
+        { version: 'v3.2.26', changes: ['新增「每月」提醒（指定日期或每月最后一天）', '新增「每年」提醒（生日、纪念日等）', '新增「农历每年」提醒（支持农历生日、闰月）', '修正通知文案中每周提醒被显示为「每天」的问题'] },
         { version: 'v3.2.25', changes: ['修复：删除全部通知记录后未落盘（重启会恢复）的问题', '修复：非法时间/不存在日期会被静默保存的问题，改为明确提示', '通知记录改为按保留期安全清理，兼容历史时间格式', '新增 LOG_RETENTION_DAYS 环境变量（默认 30 天）'] },
         { version: 'v3.2.24', changes: ['页脚仅保留账号保护状态，移除 API Key 相关提示'] },
         { version: 'v3.2.23', changes: ['优化设置页安全状态：账号保护已启用时不再显示「API 未认证」警告'] },
