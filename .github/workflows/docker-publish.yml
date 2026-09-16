@@ -62,7 +62,9 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: ${{ github.event_name == 'push' && github.ref_type == 'branch' }}
+          # 分支推送与标签推送都发布镜像（标签构建会产出 3.2.31 / v3.2.31 这类固定版本标签，
+          # 便于用户脱离 latest 固定版本）；PR 事件仍只构建不推送
+          push: ${{ github.event_name == 'push' }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.branch_tag.outputs.DOCKER_TAG }}
             ${{ steps.meta.outputs.tags }}
