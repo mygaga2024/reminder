@@ -327,6 +327,10 @@ input, select, button, textarea { font-family: inherit; }
 }
 .log-status.pending { background: rgba(10,132,255,0.12); color: var(--c-blue); }
 .log-status.done { background: rgba(48,209,88,0.12); color: var(--c-green); }
+.log-more {
+    text-align: center; font-size: 0.7rem; color: var(--c-text3);
+    padding: 14px 0 4px;
+}
 
 /* Custom Premium Dropdown */
 .sort-container { position: relative; }
@@ -952,7 +956,7 @@ input, select, button, textarea { font-family: inherit; }
 
             <div class="footer-info">
                 <span id="authStatus"></span><br>
-                Life Reminder v<span id="appVersion">3.2.19</span><br>
+                Life Reminder v<span id="appVersion">3.2.20</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -1685,12 +1689,16 @@ function editTask(id) {
 function paintData() {
     const allLogs = S.logs || [];
 
-    // 历史统计（仅基于通知记录本身计算）
+    // 历史统计：优先使用后端全量统计，缺失时按当前列表兜底计算
+    const stats = S.log_stats || null;
     const todayKey = dayKey(new Date());
-    document.getElementById('histToday').textContent =
-        allLogs.filter(l => dayKey(parseLogDate(l)) === todayKey).length;
-    document.getElementById('histTotal').textContent = allLogs.length;
-    document.getElementById('histDone').textContent = allLogs.filter(l => l.completed_at).length;
+    document.getElementById('histToday').textContent = stats
+        ? stats.today
+        : allLogs.filter(l => dayKey(parseLogDate(l)) === todayKey).length;
+    document.getElementById('histTotal').textContent = stats ? stats.total : allLogs.length;
+    document.getElementById('histDone').textContent = stats
+        ? stats.completed
+        : allLogs.filter(l => l.completed_at).length;
 
     // Log List with action buttons (需求1)
     const logC = document.getElementById('logContainer');
@@ -1727,6 +1735,9 @@ function paintData() {
             </div>
         </div>`;
     });
+    if (stats && stats.total > logs.length) {
+        html += `<div class="log-more">仅展示最近 ${logs.length} 条，共 ${stats.total} 条历史记录</div>`;
+    }
     logC.innerHTML = html;
 }
 
@@ -2229,6 +2240,7 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
+        { version: 'v3.2.20', changes: ['历史统计条改为后端全量统计，不再受 100 条列表上限影响', '历史记录超出展示上限时提示「仅展示最近 N 条」'] },
         { version: 'v3.2.19', changes: ['多账号：自助注册 / 登录 / 登出 / 改密，账号数据完全隔离', '账号安全：PBKDF2 密码哈希、会话 token 摘要存储、登录失败锁定', 'UI 改版：全新设计令牌、卡片与 Dock 视觉升级、浅色模式优化', '数据页去除柱状图，改为按日期分组的历史记录 + 统计条', '开放模式遗留数据可在设置页一键导入账号'] },
         { version: 'v3.2.18', changes: ['节假日库启动年检 + 容器自动升级', 'chinese_calendar 升级至 >=1.11.0，支持 2026 年'] },
         { version: 'v3.2.17', changes: ['升级 chinese_calendar 至 >=1.11.0，支持 2026 年中国法定节假日'] },

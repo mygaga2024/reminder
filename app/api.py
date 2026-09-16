@@ -13,6 +13,9 @@ from app.auth import (
 from app.scheduler import update_scheduler
 from app import users
 
+# 通知记录接口单次返回上限（历史统计仍按全量计算）
+LOG_LIST_LIMIT = 100
+
 
 def register_routes(app, db: dict, logs: list, scheduler):
     """注册所有 API 路由"""
@@ -50,6 +53,27 @@ def register_routes(app, db: dict, logs: list, scheduler):
     def _visible_logs() -> list:
         """当前账号可见的通知记录（元素为原对象引用）"""
         return [l for l in app.config['GLOBAL_LOGS'] if _log_visible(l)]
+
+    def _is_today(value) -> bool:
+        """判断 ISO 时间串是否落在今天（按服务时区）"""
+        if not value:
+            return False
+        try:
+            parsed = datetime.datetime.fromisoformat(value)
+        except (TypeError, ValueError):
+            return False
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=TZ_ENV)
+        return parsed.astimezone(TZ_ENV).date() == datetime.datetime.now(TZ_ENV).date()
+
+    def _log_stats(visible: list) -> dict:
+        """通知记录统计（按全部可见记录计算，不受列表截断影响）"""
+        return {
+            "total": len(visible),
+            "today": len([l for l in visible if _is_today(l.get("triggered_at"))]),
+            "completed": len([l for l in visible if l.get("completed_at")]),
+            "limit": LOG_LIST_LIMIT
+        }
 
     def _persist(persist_logs: bool = False) -> None:
         """落盘：重建调度器合并视图后写入 config.json"""
@@ -263,13 +287,15 @@ def register_routes(app, db: dict, logs: list, scheduler):
                 if username:
                     status["profile"] = users.public_user_info(db, username)
 
+                visible_logs = _visible_logs()
                 return jsonify({
                     "db": {
                         "reminders": scope["reminders"],
                         "settings": scope["settings"],
                         "users": {}
                     },
-                    "logs": _visible_logs()[-100:],
+                    "logs": visible_logs[-LOG_LIST_LIMIT:],
+                    "log_stats": _log_stats(visible_logs),
                     "syslogs": app.config['LIST_HANDLER'].logs[::-1],
                     "version": VERSION,
                     "persistence": PERSISTENCE_HEALTH,

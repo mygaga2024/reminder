@@ -473,3 +473,44 @@ class TestMultiAccount:
         status = client.get('/api/auth/status').get_json()
         assert status["legacy"]["reminders"] == 1
         assert status["registration_enabled"] is True
+
+
+class TestLogStats:
+    """历史统计：按全量记录计算，不受返回列表长度上限影响"""
+
+    def test_log_stats_counts_all_records(self, client, app):
+        import datetime as dt
+        from app.config import TZ_ENV
+        now = dt.datetime.now(TZ_ENV)
+        app.config['GLOBAL_LOGS'] = [
+            {"id": f"log-{i}", "reminder_id": "r1", "title": f"记录 {i}",
+             "triggered_at": (now - dt.timedelta(days=i)).isoformat(),
+             "completed_at": now.isoformat() if i == 0 else None}
+            for i in range(120)
+        ]
+
+        state = client.get('/api/state').get_json()
+        assert len(state["logs"]) == 100
+        assert state["log_stats"]["total"] == 120
+        assert state["log_stats"]["today"] == 1
+        assert state["log_stats"]["completed"] == 1
+        assert state["log_stats"]["limit"] == 100
+
+    def test_log_stats_isolated_per_account(self, client, app):
+        import datetime as dt
+        from app.config import TZ_ENV
+        now = dt.datetime.now(TZ_ENV)
+        token = client.post('/api/auth/register', json={
+            "username": "alice", "password": "secret123", "confirm": "secret123"
+        }).get_json()["token"]
+        app.config['GLOBAL_LOGS'] = [
+            {"id": "log-a", "title": "alice", "user": "alice",
+             "triggered_at": now.isoformat(), "completed_at": None},
+            {"id": "log-b", "title": "bob", "user": "bob",
+             "triggered_at": now.isoformat(), "completed_at": None},
+            {"id": "log-legacy", "title": "遗留", "triggered_at": now.isoformat(), "completed_at": None}
+        ]
+
+        state = client.get('/api/state', headers={"X-Auth-Token": token}).get_json()
+        assert state["log_stats"]["total"] == 1
+        assert [l["id"] for l in state["logs"]] == ["log-a"]
