@@ -453,6 +453,9 @@ input, select, button, textarea { font-family: inherit; }
     font-size: 0.7rem; color: var(--c-text3);
     line-height: 1.6;
 }
+#authStatus, #apiKeyStatus { display: block; }
+#apiKeyStatus { font-size: 0.66rem; opacity: 0.85; margin-bottom: 4px; }
+#apiKeyStatus:empty { display: none; }
 
 /* ═══════════════════════════════════════════
    Bottom Dock
@@ -990,8 +993,9 @@ input, select, button, textarea { font-family: inherit; }
             </div>
 
             <div class="footer-info">
-                <span id="authStatus"></span><br>
-                Life Reminder v<span id="appVersion">3.2.22</span><br>
+                <span id="authStatus"></span>
+                <span id="apiKeyStatus"></span>
+                Life Reminder v<span id="appVersion">3.2.23</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -1983,12 +1987,24 @@ function paintSettings() {
     document.getElementById('w_sms_api').value = wh.sms_api || '';
     document.getElementById('w_voice_api').value = wh.voice_api || '';
 
-    const authStatus = document.getElementById('authStatus');
-    if (authStatus) {
-        if (S.auth_required) {
-            authStatus.innerHTML = '<i class="fas fa-shield-halved" style="color:var(--c-green)"></i> <span style="color:var(--c-green)">API Key 已认证</span>';
+    // 安全状态：以「账号登录保护」为主，API Key 仅作补充说明
+    const accountProtected = account.login_required === true;
+    const authEl = document.getElementById('authStatus');
+    if (authEl) {
+        if (accountProtected) {
+            authEl.innerHTML = '<i class="fas fa-shield-halved" style="color:var(--c-green)"></i> <span style="color:var(--c-green)">账号保护已启用</span>';
         } else {
-            authStatus.innerHTML = '<i class="fas fa-triangle-exclamation" style="color:var(--c-orange)"></i> <span style="color:var(--c-orange)">API 未认证（公开模式）</span>';
+            authEl.innerHTML = '<i class="fas fa-triangle-exclamation" style="color:var(--c-orange)"></i> <span style="color:var(--c-orange)">尚未启用登录保护，建议注册账号</span>';
+        }
+    }
+    const keyEl = document.getElementById('apiKeyStatus');
+    if (keyEl) {
+        if (S.auth_required) {
+            keyEl.textContent = 'API Key 已启用（脚本调用 /api 需携带密钥）';
+        } else if (accountProtected) {
+            keyEl.textContent = 'API Key 未启用（仅影响脚本直连 /api）';
+        } else {
+            keyEl.textContent = '';
         }
     }
 }
@@ -2366,7 +2382,8 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
-        { version: 'v3.2.22', changes: ['新增账号昵称：首页问候语显示「下午好，昵称」', '设置页可修改昵称（留空恢复显示用户名），账号卡片同步显示'] },
+        { version: 'v3.2.23', changes: ['优化设置页安全状态：账号保护已启用时不再显示「API 未认证」警告'] },
+        { version: 'v3.2.22', changes: ['新增账号昵称：首页问候语显示', '设置页可修改昵称（留空恢复显示用户名），账号卡片同步显示'] },
         { version: 'v3.2.21', changes: ['修复开放模式下注册/登录页被 12 秒轮询强制关闭的问题', '登录页仅在拿到登录态时自动收起；增加「暂不注册，返回首页」入口'] },
         { version: 'v3.2.20', changes: ['历史统计条改为后端全量统计，不再受 100 条列表上限影响', '历史记录超出展示上限时提示「仅展示最近 N 条」'] },
         { version: 'v3.2.19', changes: ['多账号：自助注册 / 登录 / 登出 / 改密，账号数据完全隔离', '账号安全：PBKDF2 密码哈希、会话 token 摘要存储、登录失败锁定', 'UI 改版：全新设计令牌、卡片与 Dock 视觉升级、浅色模式优化', '数据页去除柱状图，改为按日期分组的历史记录 + 统计条', '开放模式遗留数据可在设置页一键导入账号'] },
