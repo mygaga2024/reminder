@@ -171,7 +171,10 @@ reminder/
 │   ├── notifier.py          # 多渠道 Webhook 通知引擎
 │   ├── scheduler.py         # APScheduler 调度管理
 │   └── api.py               # REST API 路由
-├── templates/index.html     # Vanilla JS SPA 前端
+├── templates/
+│   ├── index.html           # SPA 页面骨架
+│   ├── app.css              # 样式表（/app.css）
+│   └── app.js               # 前端逻辑（/app.js）
 ├── tests/                   # pytest 44 用例
 ├── Dockerfile               # python:3.11-slim
 └── docker-compose.yaml

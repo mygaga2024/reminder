@@ -6,6 +6,7 @@ import stat
 import tempfile
 import threading
 from app.config import logger, PERSISTENCE_HEALTH, DATA_DIR, CONFIG_FILE, LOGS_FILE
+from app.config import CURRENT_SCHEMA_VERSION
 
 db_lock = threading.RLock()
 
@@ -269,6 +270,14 @@ def init_db(db: dict, logs: list) -> tuple:
         db["settings"] = {"sound": True, "vibrate": True, "notify": True, "dark": True}
     if "users" not in db:
         db["users"] = {}
+    # 结构版本：老数据（无该字段）视为 v1，后续迁移据此判断
+    try:
+        schema_version = int(db.get("schema_version", 1))
+    except (TypeError, ValueError, OverflowError):
+        schema_version = 1
+    if schema_version < CURRENT_SCHEMA_VERSION:
+        logger.info(f"检测到数据版本 v{schema_version}，将升级至 v{CURRENT_SCHEMA_VERSION}")
+    db["schema_version"] = max(schema_version, CURRENT_SCHEMA_VERSION)
     if not isinstance(logs, list):
         logs = []
     return db, logs

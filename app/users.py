@@ -13,7 +13,7 @@ import hmac
 import re
 import secrets
 
-from app.config import logger, TZ_ENV
+from app.config import logger, TZ_ENV, CURRENT_SCHEMA_VERSION
 
 USERNAME_PATTERN = re.compile(r'^[A-Za-z0-9_\u4e00-\u9fa5-]{2,32}$')
 PASSWORD_MIN_LENGTH = 6
@@ -545,6 +545,11 @@ def public_user_info(db: dict, username: str):
 
 def migrate_db(db: dict) -> dict:
     """启动时结构迁移：补齐账号结构、清理过期会话、重建合并视图"""
+    try:
+        schema_version = int(db.get("schema_version", 1))
+    except (TypeError, ValueError, OverflowError):
+        schema_version = 1
+
     users = users_map(db)
     for name, user in list(users.items()):
         if not isinstance(user, dict):
@@ -558,12 +563,17 @@ def migrate_db(db: dict) -> dict:
     purged = purge_expired_sessions(db)
     merged = rebuild_flat_reminders(db)
     legacy = len([r for r in merged if not r.get("user")])
+    db["schema_version"] = max(schema_version, CURRENT_SCHEMA_VERSION)
 
     info = {
+        "schema_version": db["schema_version"],
+        "upgraded_from": schema_version if schema_version < CURRENT_SCHEMA_VERSION else None,
         "accounts": account_count(db),
         "sessions": len(sessions_map(db)),
         "purged_sessions": purged,
         "reminders": len(merged),
         "legacy_reminders": legacy,
     }
+    if info["upgraded_from"] is not None:
+        logger.info(f"数据结构已升级: v{schema_version} → v{db['schema_version']}")
     return info

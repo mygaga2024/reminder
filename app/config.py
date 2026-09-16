@@ -3,7 +3,10 @@ import re
 import logging
 import zoneinfo
 
-VERSION = "3.2.28"
+VERSION = "3.2.29"
+
+# config.json 结构版本：1 = 单用户，2 = 多账号 + 农历/新增重复模式
+CURRENT_SCHEMA_VERSION = 2
 
 DATETIME_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$')
 TIME_PATTERN = re.compile(r'^\d{1,2}:\d{2}$')

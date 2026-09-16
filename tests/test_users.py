@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import datetime
 import pytest
 
-from app.config import TZ_ENV
+from app.config import TZ_ENV, CURRENT_SCHEMA_VERSION
 from app import users
 
 
@@ -283,6 +283,22 @@ class TestLegacyMigration:
         stats = users.legacy_stats(db, logs)
         assert stats["reminders"] == 1
         assert stats["logs"] == 1
+
+    def test_migrate_db_sets_schema_version(self):
+        db = make_db()
+        info = users.migrate_db(db)
+
+        assert db["schema_version"] == CURRENT_SCHEMA_VERSION
+        assert info["schema_version"] == CURRENT_SCHEMA_VERSION
+        assert info["upgraded_from"] == 1
+
+    def test_migrate_db_keeps_newer_schema_version(self):
+        db = make_db()
+        db["schema_version"] = CURRENT_SCHEMA_VERSION
+
+        info = users.migrate_db(db)
+
+        assert info["upgraded_from"] is None
 
     def test_migrate_db_normalizes_and_purges(self):
         db = make_db()

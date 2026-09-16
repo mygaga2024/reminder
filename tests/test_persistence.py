@@ -7,6 +7,7 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.persistence import load_json, save_json, init_db, run_health_check
+from app.config import CURRENT_SCHEMA_VERSION
 
 
 class TestLoadJson:
@@ -146,6 +147,7 @@ class TestInitDb:
         assert db["reminders"] == []
         assert db["settings"] != {}
         assert db["users"] == {}
+        assert db["schema_version"] == CURRENT_SCHEMA_VERSION
         assert logs == []
 
     def test_init_partial_db(self):
@@ -155,3 +157,15 @@ class TestInitDb:
         assert len(db["reminders"]) == 1
         assert db["users"] == {}
         assert len(logs) == 1
+
+    def test_init_db_upgrades_legacy_schema(self):
+        db, _ = init_db({"reminders": [], "settings": {}, "users": {}}, [])
+        assert db["schema_version"] == CURRENT_SCHEMA_VERSION
+
+    def test_init_db_keeps_newer_schema(self):
+        db, _ = init_db({"reminders": [], "settings": {}, "users": {}, "schema_version": 99}, [])
+        assert db["schema_version"] == 99
+
+    def test_init_db_tolerates_broken_schema_value(self):
+        db, _ = init_db({"reminders": [], "settings": {}, "users": {}, "schema_version": "abc"}, [])
+        assert db["schema_version"] == CURRENT_SCHEMA_VERSION

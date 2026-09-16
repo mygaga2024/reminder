@@ -121,6 +121,28 @@ def register_routes(app, db: dict, logs: list, scheduler):
             logger.error(f"加载首页失败: {e}")
             return "错误：加载页面失败", 500
 
+    def _serve_template_asset(filename: str, content_type: str):
+        """提供前端静态资源（无构建工具，直接读取 templates/ 下的文件）"""
+        try:
+            with open(os.path.join('templates', filename), 'r', encoding='utf-8') as f:
+                content = f.read()
+            # 版本升级后需要立即生效，禁用缓存
+            return content, 200, {'Content-Type': content_type, 'Cache-Control': 'no-store'}
+        except FileNotFoundError:
+            logger.error(f"前端资源不存在: {filename}")
+            return f"/* 资源缺失: {filename} */", 404, {'Content-Type': content_type}
+        except Exception as e:
+            logger.error(f"加载前端资源失败 ({filename}): {e}")
+            return f"/* 资源加载失败: {filename} */", 500, {'Content-Type': content_type}
+
+    @app.route('/app.css')
+    def app_css():
+        return _serve_template_asset('app.css', 'text/css; charset=utf-8')
+
+    @app.route('/app.js')
+    def app_js():
+        return _serve_template_asset('app.js', 'application/javascript; charset=utf-8')
+
     # ═══════════════════════════════════════════
     # 账号体系（注册 / 登录 / 登出 / 改密）
     # ═══════════════════════════════════════════

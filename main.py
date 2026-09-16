@@ -45,6 +45,7 @@ if account_info["accounts"]:
     )
 else:
     logger.warning("多账号模式: 未注册账号（开放模式，注册后自动启用数据隔离）")
+logger.info(f"数据结构版本: v{account_info['schema_version']}")
 if account_info["legacy_reminders"]:
     logger.info(f"开放模式提醒: {account_info['legacy_reminders']} 条（可被首个账号继承）")
 if account_info["purged_sessions"]:
