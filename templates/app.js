@@ -1437,6 +1437,7 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
+        { version: 'v3.2.31', changes: ['新增安全网：清空全部提醒时自动留档 config.json.preclear_时间戳（保留 5 份）', 'README 新增数据备份与恢复说明、升级前必读提示'] },
         { version: 'v3.2.30', changes: ['移除半成品的微信小程序登录接口 /api/wxlogin', '文档修正：极空间兼容策略始终启用（ZSPACE_COMPAT 为占位项）', 'README 新增 v3.2.19 → v3.2.30 升级说明'] },
         { version: 'v3.2.29', changes: ['前端结构重构：样式与脚本拆分为 app.css / app.js（无构建工具）', 'config.json 新增 schema_version 结构版本字段，便于后续迁移'] },
         { version: 'v3.2.28', changes: ['新增：退出其他设备（当前设备保持登录）', '新增：注销账号（密码 + 用户名二次确认，数据一并删除）'] },

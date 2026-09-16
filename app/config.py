@@ -3,7 +3,7 @@ import re
 import logging
 import zoneinfo
 
-VERSION = "3.2.30"
+VERSION = "3.2.31"
 
 # config.json 结构版本：1 = 单用户，2 = 多账号 + 农历/新增重复模式
 CURRENT_SCHEMA_VERSION = 2

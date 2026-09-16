@@ -1,12 +1,14 @@
 """Persistence layer tests"""
 import os
 import json
+import glob
 import tempfile
 import pytest
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.persistence import load_json, save_json, init_db, run_health_check
+from app.persistence import PRECLEAR_BACKUP_KEEP
 from app.config import CURRENT_SCHEMA_VERSION
 
 
@@ -137,6 +139,70 @@ class TestSaveJson:
             assert content["reminders"]
         finally:
             os.unlink(path)
+
+
+class TestPreclearBackup:
+    """清空全部提醒时自动留档，便于误删恢复"""
+
+    @pytest.fixture
+    def path(self, tmp_path):
+        return str(tmp_path / "config.json")
+
+    def backups(self, path):
+        return sorted(glob.glob(path + ".preclear_*"))
+
+    def test_clearing_reminders_creates_backup(self, path):
+        save_json(path, {"reminders": [{"id": "r1"}, {"id": "r2"}], "settings": {}, "users": {}})
+
+        save_json(path, {"reminders": [], "settings": {}, "users": {}})
+
+        backups = self.backups(path)
+        assert len(backups) == 1
+        with open(backups[0]) as f:
+            assert len(json.load(f)["reminders"]) == 2
+        with open(path) as f:
+            assert json.load(f)["reminders"] == []
+
+    def test_normal_save_creates_no_backup(self, path):
+        save_json(path, {"reminders": [{"id": "r1"}], "settings": {}, "users": {}})
+
+        save_json(path, {"reminders": [{"id": "r1"}, {"id": "r2"}], "settings": {}, "users": {}})
+        save_json(path, {"reminders": [{"id": "r2"}], "settings": {}, "users": {}})
+
+        assert self.backups(path) == []
+
+    def test_no_backup_when_other_account_still_has_reminders(self, path):
+        save_json(path, {"reminders": [{"id": "a1"}], "settings": {}, "users": {}})
+
+        save_json(path, {
+            "reminders": [{"id": "b1"}],
+            "settings": {},
+            "users": {"a": {"reminders": []}, "b": {"reminders": [{"id": "b1"}]}}
+        })
+
+        assert self.backups(path) == []
+
+    def test_backup_count_is_capped(self, path):
+        save_json(path, {"reminders": [{"id": "r1"}], "settings": {}, "users": {}})
+        for i in range(6):
+            with open(f"{path}.preclear_2026010{i}000000", "w") as f:
+                json.dump({"reminders": [{"id": f"old{i}"}]}, f)
+
+        save_json(path, {"reminders": [], "settings": {}, "users": {}})
+
+        backups = [os.path.basename(p) for p in self.backups(path)]
+        assert len(backups) == PRECLEAR_BACKUP_KEEP
+        # 最旧的两份被清理，最新一份（本次清空）保留
+        assert "config.json.preclear_20260100000000" not in backups
+        assert "config.json.preclear_20260101000000" not in backups
+        assert any(name.startswith("config.json.preclear_2026") and len(name) == len("config.json.preclear_20260916211334") for name in backups)
+
+    def test_broken_payload_creates_no_backup(self, path):
+        save_json(path, {"reminders": [{"id": "r1"}] * 50, "settings": {}, "users": {}})
+
+        save_json(path, None)
+
+        assert self.backups(path) == []
 
 
 class TestInitDb:

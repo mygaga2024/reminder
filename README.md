@@ -4,6 +4,10 @@
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/mygaga2024/reminder)](https://github.com/mygaga2024/reminder/pkgs/container/reminder)
 
+> ⚠️ **从 v3.2.18 或更早版本升级前，请先阅读[升级说明](#升级说明v3219--v3230影响所有既有安装)**：
+> 注册账号后所有 `/api/*` 都要求登录态、`/api/wxlogin` 已移除。建议先备份 `data/` 目录，
+> 或改用固定版本镜像（如 `ghcr.io/mygaga2024/reminder:3.2.31`）而不跟随 `latest`。
+
 ## 核心特性
 
 - **精美 UI**：iOS 风格 SPA 界面，支持深色/浅色模式切换
@@ -209,7 +213,27 @@ reminder/
 **数据写入（v3.2.25 / v3.2.27）**
 
 - 「删除最后一条提醒 / 最后一条通知记录」现在会正常落盘（此前被空数据保护拦截，重启后数据会“复活”）
-- 空数据保护改为只拦截结构损坏的写入（`None` / 空 dict）；清空全部提醒时会写一条 WARNING 日志便于排查
+- 空数据保护改为只拦截结构损坏的写入（`None` / 空 dict）
+- **清空全部提醒时会自动留档**：数据目录生成 `config.json.preclear_<时间戳>`（保留最近 5 份），可随时恢复
+
+### 数据备份与恢复
+
+| 方式 | 说明 |
+|---|---|
+| 自动留档 | 清空全部提醒时自动生成 `config.json.preclear_YYYYMMDDHHMMSS`（保留最近 5 份） |
+| 应用内导出 | 设置 → 导出备份（当前账号的提醒 / 历史 / 设置） |
+| 应用内导入 | 设置 → 导入备份（去重合并，不覆盖现有数据） |
+| 损坏自愈 | JSON 解析失败会生成 `.corrupt_YYYYMMDDHHMMSS` 备份并拒绝启动，避免二次破坏 |
+
+恢复某份留档（谨慎操作）：
+
+```bash
+cd /volume1/docker/reminder
+docker compose stop
+cp data/config.json data/config.json.before_restore     # 再保一份当前数据
+cp data/config.json.preclear_20260916211431 data/config.json
+docker compose start
+```
 
 **接口变更**
 

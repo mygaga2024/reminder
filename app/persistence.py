@@ -225,7 +225,7 @@ def save_json(filepath: str, data) -> None:
         logger.error(f"拦截异常空数据写入: {filepath}")
         return
 
-    _warn_if_reminders_cleared(filepath, data)
+    _archive_before_clear(filepath, data)
 
     with db_lock:
         if not _atomic_write(filepath, data):
@@ -245,8 +245,17 @@ def _is_broken_payload(data) -> bool:
     return not data
 
 
-def _warn_if_reminders_cleared(filepath: str, data) -> None:
-    """提醒从有到无时记录警告（可观测，但不阻止写入）"""
+# 清空前自动留档的备份保留份数（超出后删除最旧的）
+PRECLEAR_BACKUP_KEEP = 5
+
+
+def _archive_before_clear(filepath: str, data) -> None:
+    """提醒从「有」变「无」时，先把当前文件另存一份 `.preclear_时间戳` 再写入
+
+    - 删除最后一条提醒是合法操作，不拦截写入，但会留档以便误删后恢复
+    - 备份失败只记录日志，绝不阻断正常写入
+    - 多账号场景下，只要还有任一账号存在提醒（合并视图非空）就不会触发留档
+    """
     if not isinstance(data, dict) or "reminders" not in data:
         return
     if len(data["reminders"]) > 0:
@@ -254,12 +263,58 @@ def _warn_if_reminders_cleared(filepath: str, data) -> None:
     for user in (data.get("users") or {}).values():
         if isinstance(user, dict) and user.get("reminders"):
             return
-    try:
-        if not os.path.exists(filepath) or os.path.getsize(filepath) <= 100:
-            return
-    except OSError:
+    if not _previous_has_reminders(filepath):
         return
-    logger.warning(f"提醒已全部清空并写盘（如非本人操作请检查）: {filepath}")
+    try:
+        stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        backup_path = f"{filepath}.preclear_{stamp}"
+        shutil.copy2(filepath, backup_path)
+        logger.warning(f"提醒已全部清空，已自动留档备份: {backup_path}")
+        _prune_preclear_backups(filepath)
+    except Exception as e:
+        logger.error(f"清空提醒前留档失败（不影响本次写入）: {e}")
+
+
+def _previous_has_reminders(filepath: str) -> bool:
+    """读取当前文件，判断清空前是否真的存在提醒（避免无意义留档）"""
+    try:
+        if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
+            return False
+        with open(filepath, "r", encoding="utf-8") as f:
+            previous = json.load(f)
+    except (OSError, ValueError) as e:
+        logger.error(f"读取旧数据失败，跳过清空留档: {e}")
+        return False
+
+    if not isinstance(previous, dict):
+        return False
+    if previous.get("reminders"):
+        return True
+    for user in (previous.get("users") or {}).values():
+        if isinstance(user, dict) and user.get("reminders"):
+            return True
+    return False
+
+
+def _prune_preclear_backups(filepath: str) -> None:
+    """只保留最近若干份 `.preclear_` 备份，避免长期占用空间"""
+    dir_path = os.path.dirname(filepath) or "."
+    prefix = os.path.basename(filepath) + ".preclear_"
+    try:
+        candidates = sorted(
+            name for name in os.listdir(dir_path)
+            if name.startswith(prefix) and not name.endswith(".tmp")
+        )
+    except OSError as e:
+        logger.error(f"清理清空备份失败（读取目录）: {e}")
+        return
+
+    for name in candidates[:-PRECLEAR_BACKUP_KEEP] if len(candidates) > PRECLEAR_BACKUP_KEEP else []:
+        try:
+            os.remove(os.path.join(dir_path, name))
+            logger.info(f"已清理较早的清空备份: {name}")
+        except OSError as e:
+            logger.error(f"清理清空备份失败 ({name}): {e}")
 
 
 def init_db(db: dict, logs: list) -> tuple:
