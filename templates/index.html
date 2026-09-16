@@ -757,6 +757,17 @@ input, select, button, textarea { font-family: inherit; }
 }
 .auth-error.show { display: block; }
 .auth-hint { font-size: 0.72rem; color: var(--c-text3); text-align: center; margin-top: 16px; line-height: 1.7; }
+.auth-dismiss {
+    display: none;
+    text-align: center;
+    margin-top: 14px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--c-text2);
+    text-decoration: none;
+    padding: 8px;
+}
+.auth-dismiss:active { color: var(--c-blue); }
 .claim-row {
     display: none;
     align-items: flex-start; gap: 10px;
@@ -956,7 +967,7 @@ input, select, button, textarea { font-family: inherit; }
 
             <div class="footer-info">
                 <span id="authStatus"></span><br>
-                Life Reminder v<span id="appVersion">3.2.20</span><br>
+                Life Reminder v<span id="appVersion">3.2.21</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -1003,6 +1014,7 @@ input, select, button, textarea { font-family: inherit; }
             </label>
             <div class="auth-error" id="authError"></div>
             <button class="btn-submit" id="authSubmit" onclick="submitAuth()">登录</button>
+            <a href="javascript:void(0)" class="auth-dismiss" id="authDismiss" onclick="dismissAuth()">暂不注册，返回首页</a>
             <p class="auth-hint" id="authHint">账号数据相互隔离，互不可见</p>
         </div>
     </div>
@@ -1222,6 +1234,9 @@ function apiHeaders() {
 const TOKEN_KEY = 'reminder_token';
 let authMode = 'login';
 let authStatus = null;
+// true = 系统已启用账号体系（必须登录，登录页不可关闭）
+// false = 开放模式下用户主动打开注册/登录页（可返回）
+let authForced = false;
 
 function getToken() { return localStorage.getItem(TOKEN_KEY) || ''; }
 function setToken(token) {
@@ -1280,20 +1295,36 @@ function paintAuthOptions() {
     if (registering && hasLegacy) hint.textContent = '勾选后可把当前未登录模式下的提醒与历史迁移到新账号';
     else if (allowed) hint.textContent = '账号数据相互隔离，互不可见';
     else hint.textContent = '管理员已关闭自助注册';
+
+    // 强制登录（已有账号）时不允许关闭；开放模式下主动打开可随时返回
+    const dismiss = document.getElementById('authDismiss');
+    dismiss.style.display = authForced ? 'none' : 'block';
+    dismiss.textContent = registering ? '暂不注册，返回首页' : '暂不登录，返回首页';
 }
 
-async function openAuth(mode, status) {
+async function openAuth(mode, status, forced) {
     authStatus = status || await fetchAuthStatus() || {
         accounts: 1, login_required: true, registration_enabled: true, legacy: { reminders: 0, logs: 0 }
     };
+    authForced = forced !== undefined ? !!forced : !!authStatus.login_required;
     document.getElementById('authScreen').classList.add('show');
     switchAuth(mode || (authStatus.accounts === 0 ? 'register' : 'login'));
 }
 
-function openRegister() { openAuth('register'); }
+function openRegister() { openAuth('register', null, false); }
+
+function isAuthVisible() {
+    return document.getElementById('authScreen').classList.contains('show');
+}
 
 function hideAuth() {
     document.getElementById('authScreen').classList.remove('show');
+}
+
+function dismissAuth() {
+    // 已有账号时必须登录，不允许跳过
+    if (authForced) return;
+    hideAuth();
 }
 
 async function submitAuth() {
@@ -1325,6 +1356,7 @@ async function submitAuth() {
         document.getElementById('auth_pass').value = '';
         document.getElementById('auth_pass2').value = '';
         authStatus = null;
+        authForced = false;
         hideAuth();
         await sync();
         if (registering) {
@@ -1421,7 +1453,14 @@ async function sync() {
             // 会话失效：清除本地 token 并回到登录界面
             setToken('');
             S = null;
-            await openAuth('login');
+            if (isAuthVisible()) {
+                // 登录页已展示：只刷新账号状态，不重建表单（避免清掉用户正在输入的内容）
+                authStatus = await fetchAuthStatus();
+                authForced = true;
+                paintAuthOptions();
+            } else {
+                await openAuth('login', null, true);
+            }
             return;
         }
         const payload = await res.json();
@@ -1430,7 +1469,8 @@ async function sync() {
             return;
         }
         S = payload;
-        hideAuth();
+        // 仅在拿到会话（已登录）时收起登录页；开放模式下用户主动打开的注册页不受轮询影响
+        if (S.account && S.account.user && isAuthVisible()) hideAuth();
         if (S.version) document.getElementById('appVersion').textContent = S.version;
         
         // Check persistence health
@@ -2240,6 +2280,7 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
+        { version: 'v3.2.21', changes: ['修复开放模式下注册/登录页被 12 秒轮询强制关闭的问题', '登录页仅在拿到登录态时自动收起；增加「暂不注册，返回首页」入口'] },
         { version: 'v3.2.20', changes: ['历史统计条改为后端全量统计，不再受 100 条列表上限影响', '历史记录超出展示上限时提示「仅展示最近 N 条」'] },
         { version: 'v3.2.19', changes: ['多账号：自助注册 / 登录 / 登出 / 改密，账号数据完全隔离', '账号安全：PBKDF2 密码哈希、会话 token 摘要存储、登录失败锁定', 'UI 改版：全新设计令牌、卡片与 Dock 视觉升级、浅色模式优化', '数据页去除柱状图，改为按日期分组的历史记录 + 统计条', '开放模式遗留数据可在设置页一键导入账号'] },
         { version: 'v3.2.18', changes: ['节假日库启动年检 + 容器自动升级', 'chinese_calendar 升级至 >=1.11.0，支持 2026 年'] },
@@ -2299,7 +2340,7 @@ function closeSheet() {
 (async function bootstrap() {
     authStatus = await fetchAuthStatus();
     if (authStatus && authStatus.login_required && !getToken()) {
-        await openAuth(authStatus.accounts === 0 ? 'register' : 'login', authStatus);
+        await openAuth(authStatus.accounts === 0 ? 'register' : 'login', authStatus, true);
         return;
     }
     await sync();
