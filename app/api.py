@@ -4,17 +4,25 @@ import os
 import json
 from flask import request, jsonify, g
 from app.config import logger, VERSION, PERSISTENCE_HEALTH, API_KEY
-from app.config import CONFIG_FILE, LOGS_FILE, TZ_ENV, ALLOW_REGISTRATION
+from app.config import CONFIG_FILE, LOGS_FILE, TZ_ENV, ALLOW_REGISTRATION, VALID_PRIORITIES
 from app.persistence import save_json, db_lock
 from app.auth import (
     require_api_key, require_login, current_token,
     validate_reminder_input, validate_webhook_url, sanitize_log_message
 )
 from app.scheduler import update_scheduler
+from app.notifier import send_test_notification
 from app import users
 
 # 通知记录接口单次返回上限（历史统计仍按全量计算）
 LOG_LIST_LIMIT = 100
+# 「稍后提醒」默认延后分钟数与上限
+SNOOZE_DEFAULT_MINUTES = 10
+SNOOZE_MAX_MINUTES = 1440
+# 单次导入的提醒条数上限
+IMPORT_MAX_ITEMS = 1000
+# 允许测试/配置的推送渠道
+WEBHOOK_CHANNELS = ("wecom", "dingtalk", "lark", "sms_phone", "sms_api", "voice_api")
 
 
 def register_routes(app, db: dict, logs: list, scheduler):
@@ -430,6 +438,119 @@ def register_routes(app, db: dict, logs: list, scheduler):
                 logger.error(f"修改设置失败: {e}")
                 return jsonify({"error": "修改设置失败"}), 500
 
+    @app.route('/api/settings/test-webhook', methods=['POST'])
+    @require_api_key
+    @require_login
+    def test_webhook():
+        """向指定渠道发送测试推送（优先使用请求中未保存的地址）"""
+        with db_lock:
+            try:
+                payload = request.json or {}
+                channel = (payload.get("channel") or "").strip()
+                if channel not in WEBHOOK_CHANNELS:
+                    return jsonify({"error": "不支持的推送渠道"}), 400
+
+                webhooks = _scope_settings().get("webhooks") or {}
+                url = (payload.get("url") or webhooks.get(channel) or "").strip()
+                if not url:
+                    return jsonify({"error": "请先填写该渠道的 Webhook 地址"}), 400
+                if not validate_webhook_url(url):
+                    return jsonify({"error": "Webhook URL 格式无效"}), 400
+
+                ok, message = send_test_notification(channel, url)
+                logger.info(f"测试推送 ({channel}): {message}")
+                if not ok:
+                    return jsonify({"error": message}), 502
+                return jsonify({"status": "ok", "message": message})
+            except Exception as e:
+                logger.error(f"测试推送失败: {e}")
+                return jsonify({"error": "测试推送失败"}), 500
+
+    @app.route('/api/reminders/snooze', methods=['POST'])
+    @require_api_key
+    @require_login
+    def snooze_reminder():
+        """基于通知记录创建「稍后提醒」（默认 10 分钟后触发的一次性任务）"""
+        with db_lock:
+            try:
+                payload = request.json or {}
+                log_id = (payload.get("log_id") or "").strip()
+                if not log_id:
+                    return jsonify({"error": "缺少通知记录 id"}), 400
+
+                entry = next(
+                    (l for l in app.config['GLOBAL_LOGS'] if l.get("id") == log_id and _log_visible(l)),
+                    None
+                )
+                if entry is None:
+                    return jsonify({"error": "通知记录不存在"}), 404
+
+                try:
+                    minutes = int(payload.get("minutes", SNOOZE_DEFAULT_MINUTES))
+                except (TypeError, ValueError, OverflowError):
+                    minutes = SNOOZE_DEFAULT_MINUTES
+                minutes = max(1, min(minutes, SNOOZE_MAX_MINUTES))
+
+                scope = _scope_reminders()
+                source = next(
+                    (r for r in scope if r.get("id") == entry.get("reminder_id")),
+                    None
+                )
+                priority = (source or {}).get("priority")
+                if priority not in VALID_PRIORITIES:
+                    priority = "mid"
+
+                username = _username()
+                now = datetime.datetime.now(TZ_ENV)
+                reminder = {
+                    "id": str(uuid.uuid4()),
+                    "title": f"{entry.get('title') or '提醒'}（稍后提醒）",
+                    "time": (now + datetime.timedelta(minutes=minutes)).strftime("%Y-%m-%d %H:%M"),
+                    "repeat": "once",
+                    "priority": priority,
+                    "status": "pending",
+                    "created_at": now.isoformat(),
+                    "snoozed_from": entry.get("reminder_id")
+                }
+                if username:
+                    reminder["user"] = username
+                scope.append(reminder)
+                _persist()
+                update_scheduler(scheduler, db, _make_notify_fn(app))
+                logger.info(f"稍后提醒已创建: {reminder['title']} - {reminder['time']} ({minutes} 分钟后)")
+                return jsonify(reminder)
+            except Exception as e:
+                logger.error(f"创建稍后提醒失败: {e}")
+                return jsonify({"error": "创建稍后提醒失败"}), 500
+
+    @app.route('/api/logs/complete/<log_id>', methods=['POST'])
+    @require_api_key
+    @require_login
+    def complete_log(log_id):
+        """切换通知记录的「已处理」状态"""
+        with db_lock:
+            try:
+                entry = next(
+                    (l for l in app.config['GLOBAL_LOGS'] if l.get("id") == log_id and _log_visible(l)),
+                    None
+                )
+                if entry is None:
+                    return jsonify({"error": "通知记录不存在"}), 404
+
+                if entry.get("completed_at"):
+                    entry["completed_at"] = None
+                    completed = False
+                else:
+                    entry["completed_at"] = datetime.datetime.now(TZ_ENV).isoformat()
+                    completed = True
+
+                save_json(LOGS_FILE, app.config['GLOBAL_LOGS'])
+                logger.info(f"通知记录{'标记已处理' if completed else '取消已处理'}: {log_id}")
+                return jsonify({"status": "ok", "completed": completed})
+            except Exception as e:
+                logger.error(f"更新通知记录状态失败: {e}")
+                return jsonify({"error": "更新通知记录状态失败"}), 500
+
     @app.route('/api/logs/<log_id>', methods=['DELETE'])
     @require_api_key
     @require_login
@@ -510,6 +631,104 @@ def register_routes(app, db: dict, logs: list, scheduler):
             except Exception as e:
                 logger.error(f"清空已完成任务失败: {e}")
                 return jsonify({"error": "清空已完成任务失败"}), 500
+
+    @app.route('/api/export')
+    @require_api_key
+    @require_login
+    def export_data():
+        """导出当前账号数据（提醒 / 通知记录 / 设置），用于备份与迁移"""
+        with db_lock:
+            try:
+                username = _username()
+                payload = {
+                    "format": "life-reminder-backup",
+                    "exported_at": datetime.datetime.now(TZ_ENV).isoformat(),
+                    "version": VERSION,
+                    "account": {
+                        "username": username,
+                        "nickname": users.get_nickname(db, username)
+                    },
+                    "settings": _scope_settings(),
+                    "reminders": _scope_reminders(),
+                    "logs": _visible_logs()
+                }
+                response = jsonify(payload)
+                stamp = datetime.datetime.now(TZ_ENV).strftime("%Y%m%d")
+                response.headers["Content-Disposition"] = f"attachment; filename=life-reminder-backup-{stamp}.json"
+                logger.info(f"导出数据: {username or '开放模式'} (提醒 {len(payload['reminders'])} 条)")
+                return response
+            except Exception as e:
+                logger.error(f"导出数据失败: {e}")
+                return jsonify({"error": "导出数据失败"}), 500
+
+    @app.route('/api/import', methods=['POST'])
+    @require_api_key
+    @require_login
+    def import_data():
+        """导入备份：按「标题 + 时间 + 重复」去重后新增，不覆盖现有数据"""
+        with db_lock:
+            try:
+                payload = request.json or {}
+                incoming = payload.get("reminders")
+                if not isinstance(incoming, list):
+                    return jsonify({"error": "导入内容缺少 reminders 列表"}), 400
+                if len(incoming) > IMPORT_MAX_ITEMS:
+                    return jsonify({"error": f"单次最多导入 {IMPORT_MAX_ITEMS} 条提醒"}), 400
+
+                username = _username()
+                scope = _scope_reminders()
+                existing_keys = {
+                    (r.get("title"), r.get("time"), r.get("repeat"))
+                    for r in scope if isinstance(r, dict)
+                }
+                added, skipped, invalid = 0, 0, 0
+                now = datetime.datetime.now(TZ_ENV)
+
+                for item in incoming:
+                    if not isinstance(item, dict):
+                        invalid += 1
+                        continue
+
+                    candidate = {
+                        "title": str(item.get("title", "")).strip(),
+                        "time": str(item.get("time", "")).strip(),
+                        "repeat": item.get("repeat", "daily"),
+                        "priority": item.get("priority", "low")
+                    }
+                    if validate_reminder_input(candidate):
+                        invalid += 1
+                        continue
+
+                    key = (candidate["title"], candidate["time"], candidate["repeat"])
+                    if key in existing_keys:
+                        skipped += 1
+                        continue
+
+                    candidate.update({
+                        "id": str(uuid.uuid4()),
+                        "status": "completed" if item.get("status") == "completed" else "pending",
+                        "created_at": now.isoformat(),
+                        "imported_at": now.isoformat()
+                    })
+                    if username:
+                        candidate["user"] = username
+                    scope.append(candidate)
+                    existing_keys.add(key)
+                    added += 1
+
+                if added:
+                    _persist()
+                    update_scheduler(scheduler, db, _make_notify_fn(app))
+                logger.info(f"导入数据: 新增 {added} 条, 跳过重复 {skipped} 条, 忽略无效 {invalid} 条")
+                return jsonify({
+                    "status": "ok",
+                    "added": added,
+                    "skipped": skipped,
+                    "invalid": invalid
+                })
+            except Exception as e:
+                logger.error(f"导入数据失败: {e}")
+                return jsonify({"error": "导入数据失败"}), 500
 
     @app.route('/api/wxlogin', methods=['POST'])
     @require_api_key

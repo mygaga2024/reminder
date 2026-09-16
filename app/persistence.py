@@ -220,36 +220,45 @@ def load_json(filepath: str, default):
 
 def save_json(filepath: str, data) -> None:
     """保存 JSON — 多重降级策略，NAS 环境自动适配"""
-    if _is_empty_overwrite(data) and os.path.exists(filepath) and os.path.getsize(filepath) > 100:
-        logger.error(f"拦截空数据写入: {filepath}")
+    if _is_broken_payload(data):
+        logger.error(f"拦截异常空数据写入: {filepath}")
         return
+
+    _warn_if_reminders_cleared(filepath, data)
 
     with db_lock:
         if not _atomic_write(filepath, data):
             raise IOError(f"持久化失败: {filepath}")
 
 
-def _is_empty_overwrite(data) -> bool:
-    """判定是否属于「疑似异常的空数据覆盖」
+def _is_broken_payload(data) -> bool:
+    """仅拦截结构损坏的 payload（None / 空 dict / 空字符串）
 
-    - 空 list（如用户删光全部通知记录）是合法状态，不拦截
-    - config.json（dict + reminders）中 reminders 为空且各账号也无任务时视为异常，
-      拒绝覆盖已有非空文件，防止内存异常导致数据被清空
+    注意：删除最后一条提醒或最后一条通知记录是**合法操作**，不再拦截；
+    真正需要拒绝的是空 payload 覆盖（例如内存异常导致的误写）。
     """
-    if not data:
-        # [] / "" / 0 等空列表或空值：日志类文件允许写入空状态
-        return not isinstance(data, list)
-    if not isinstance(data, dict) or "reminders" not in data:
+    if isinstance(data, list):
         return False
-    if len(data["reminders"]) > 0:
-        return False
+    if isinstance(data, dict):
+        return not data
+    return not data
 
-    users_map = data.get("users")
-    if isinstance(users_map, dict):
-        for user in users_map.values():
-            if isinstance(user, dict) and user.get("reminders"):
-                return False
-    return True
+
+def _warn_if_reminders_cleared(filepath: str, data) -> None:
+    """提醒从有到无时记录警告（可观测，但不阻止写入）"""
+    if not isinstance(data, dict) or "reminders" not in data:
+        return
+    if len(data["reminders"]) > 0:
+        return
+    for user in (data.get("users") or {}).values():
+        if isinstance(user, dict) and user.get("reminders"):
+            return
+    try:
+        if not os.path.exists(filepath) or os.path.getsize(filepath) <= 100:
+            return
+    except OSError:
+        return
+    logger.warning(f"提醒已全部清空并写盘（如非本人操作请检查）: {filepath}")
 
 
 def init_db(db: dict, logs: list) -> tuple:

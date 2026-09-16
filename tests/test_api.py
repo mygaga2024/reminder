@@ -4,6 +4,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import json
+import datetime
 import tempfile
 from unittest.mock import MagicMock, patch
 import pytest
@@ -609,6 +610,189 @@ class TestNicknameEndpoint:
         bob_state = client.get('/api/state', headers=self.headers(bob)).get_json()
         assert alice_state["account"]["nickname"] == "小明"
         assert bob_state["account"]["nickname"] is None
+
+
+def register_account(client, username, password="secret123"):
+    """注册账号并返回鉴权头"""
+    resp = client.post('/api/auth/register', json={
+        "username": username, "password": password, "confirm": password
+    })
+    assert resp.status_code == 200, resp.get_json()
+    return {"X-Auth-Token": resp.get_json()["token"]}
+
+
+class TestLogActions:
+    """通知记录：标记已处理 / 稍后提醒"""
+
+    def seed_log(self, app, log_id="log-1", user=None, reminder_id="r1"):
+        entry = {
+            "id": log_id, "reminder_id": reminder_id, "title": "喝一杯温水",
+            "triggered_at": "2026-09-16T09:00:00+08:00", "completed_at": None,
+            "status": "triggered"
+        }
+        if user:
+            entry["user"] = user
+        app.config['GLOBAL_LOGS'] = [entry]
+        return entry
+
+    def test_toggle_log_complete(self, client, app):
+        self.seed_log(app)
+
+        first = client.post('/api/logs/complete/log-1')
+        assert first.status_code == 200
+        assert first.get_json()["completed"] is True
+        assert app.config['GLOBAL_LOGS'][0]["completed_at"] is not None
+
+        second = client.post('/api/logs/complete/log-1')
+        assert second.get_json()["completed"] is False
+        assert app.config['GLOBAL_LOGS'][0]["completed_at"] is None
+
+    def test_toggle_log_complete_unknown_id(self, client, app):
+        self.seed_log(app)
+        assert client.post('/api/logs/complete/not-exist').status_code == 404
+
+    def test_snooze_creates_once_reminder(self, client, app):
+        headers = register_account(client, "alice")
+        self.seed_log(app, user="alice")
+
+        resp = client.post('/api/reminders/snooze', headers=headers, json={"log_id": "log-1", "minutes": 10})
+        assert resp.status_code == 200
+        created = resp.get_json()
+        assert created["repeat"] == "once"
+        assert created["title"] == "喝一杯温水（稍后提醒）"
+        assert created["user"] == "alice"
+
+        scheduled = datetime.datetime.strptime(created["time"], "%Y-%m-%d %H:%M")
+        delta = scheduled - datetime.datetime.now()
+        assert datetime.timedelta(minutes=8) < delta < datetime.timedelta(minutes=11)
+
+    def test_snooze_requires_log_id(self, client):
+        resp = client.post('/api/reminders/snooze', json={})
+        assert resp.status_code == 400
+
+    def test_snooze_other_account_log_blocked(self, client, app):
+        alice = register_account(client, "alice")
+        register_account(client, "bob")
+        self.seed_log(app, user="alice")
+
+        resp = client.post('/api/reminders/snooze', headers=alice, json={"log_id": "log-1", "minutes": 10})
+        assert resp.status_code == 200
+
+        bob_headers = {"X-Auth-Token": client.post('/api/auth/login', json={
+            "username": "bob", "password": "secret123"
+        }).get_json()["token"]}
+        resp = client.post('/api/reminders/snooze', headers=bob_headers, json={"log_id": "log-1"})
+        assert resp.status_code == 404
+
+
+class TestWebhookTest:
+    """Webhook 测试推送"""
+
+    def test_unsupported_channel_rejected(self, client):
+        assert client.post('/api/settings/test-webhook', json={"channel": "telegram"}).status_code == 400
+
+    def test_missing_url_rejected(self, client):
+        assert client.post('/api/settings/test-webhook', json={"channel": "wecom"}).status_code == 400
+
+    def test_invalid_url_rejected(self, client):
+        resp = client.post('/api/settings/test-webhook', json={"channel": "wecom", "url": "not-a-url"})
+        assert resp.status_code == 400
+
+    @patch('app.notifier.requests.post')
+    def test_successful_test_push(self, mock_post, client):
+        mock_post.return_value.status_code = 200
+        resp = client.post('/api/settings/test-webhook', json={
+            "channel": "wecom", "url": "https://qyapi.weixin.qq.com/test"
+        })
+        assert resp.status_code == 200
+        assert "测试消息已发送" in resp.get_json()["message"]
+        assert mock_post.called
+
+    @patch('app.notifier.requests.post')
+    def test_failed_test_push_reports_error(self, mock_post, client):
+        mock_post.return_value.status_code = 500
+        resp = client.post('/api/settings/test-webhook', json={
+            "channel": "lark", "url": "https://open.feishu.cn/test"
+        })
+        assert resp.status_code == 502
+        assert "HTTP 500" in resp.get_json()["error"]
+
+    @patch('app.notifier.requests.post')
+    def test_uses_saved_url_when_not_provided(self, mock_post, client):
+        mock_post.return_value.status_code = 200
+        client.post('/api/settings', json={"webhooks": {"wecom": "https://saved.example.com"}})
+
+        resp = client.post('/api/settings/test-webhook', json={"channel": "wecom"})
+
+        assert resp.status_code == 200
+        assert mock_post.call_args[0][0] == "https://saved.example.com"
+
+
+class TestBackup:
+    """数据导出 / 导入"""
+
+    def test_export_returns_only_own_data(self, client, app):
+        alice = register_account(client, "alice")
+        register_account(client, "bob")
+        client.post('/api/reminders', headers=alice, json={
+            "title": "alice 的任务", "time": "10:00", "repeat": "daily", "priority": "low"
+        })
+        app.config['GLOBAL_LOGS'] = [
+            {"id": "log-a", "title": "alice", "user": "alice", "triggered_at": "2026-09-16T09:00:00+08:00"},
+            {"id": "log-b", "title": "bob", "user": "bob", "triggered_at": "2026-09-16T09:00:00+08:00"}
+        ]
+
+        resp = client.get('/api/export', headers=alice)
+
+        assert resp.status_code == 200
+        assert "attachment" in resp.headers["Content-Disposition"]
+        data = resp.get_json()
+        assert data["format"] == "life-reminder-backup"
+        assert [r["title"] for r in data["reminders"]] == ["alice 的任务"]
+        assert [l["id"] for l in data["logs"]] == ["log-a"]
+        assert data["account"]["username"] == "alice"
+
+    def test_import_adds_and_dedupes(self, client, app):
+        payload = {
+            "reminders": [
+                {"title": "导入任务", "time": "08:00", "repeat": "daily", "priority": "mid"},
+                {"title": "导入任务", "time": "08:00", "repeat": "daily", "priority": "mid"},
+                {"title": "非法时间", "time": "abc", "repeat": "daily"},
+                {"title": "在产假期", "time": "09:00", "repeat": "lunar:08-15", "priority": "low"}
+            ]
+        }
+
+        resp = client.post('/api/import', json=payload)
+
+        assert resp.status_code == 200
+        result = resp.get_json()
+        assert result["added"] == 2
+        assert result["skipped"] == 1
+        assert result["invalid"] == 1
+
+        state = client.get('/api/state').get_json()
+        assert len(state["db"]["reminders"]) == 2
+
+    def test_import_is_idempotent(self, client):
+        payload = {"reminders": [{"title": "重复导入", "time": "08:00", "repeat": "daily", "priority": "low"}]}
+        first = client.post('/api/import', json=payload).get_json()
+        second = client.post('/api/import', json=payload).get_json()
+
+        assert first["added"] == 1
+        assert second["added"] == 0 and second["skipped"] == 1
+
+    def test_import_requires_reminders_list(self, client):
+        assert client.post('/api/import', json={"foo": "bar"}).status_code == 400
+
+    def test_import_into_current_account_only(self, client, app):
+        headers = register_account(client, "alice")
+        resp = client.post('/api/import', headers=headers, json={
+            "reminders": [{"title": "alice 导入", "time": "08:00", "repeat": "daily", "priority": "low"}]
+        })
+        assert resp.status_code == 200
+
+        state = client.get('/api/state', headers=headers).get_json()
+        assert state["db"]["reminders"][0]["user"] == "alice"
 
 
 class TestLogStats:

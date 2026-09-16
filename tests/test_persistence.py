@@ -60,7 +60,8 @@ class TestSaveJson:
         finally:
             os.unlink(path)
 
-    def test_save_empty_data_to_existing_large_file_is_blocked(self):
+    def test_save_empty_reminders_to_existing_large_file_is_allowed(self):
+        """删除最后一条提醒是合法操作，必须落盘（此前会被空数据保护拦截）"""
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             json.dump({"reminders": [{"id": "x"}] * 50}, f)
             f.flush()
@@ -69,7 +70,22 @@ class TestSaveJson:
             save_json(path, {"reminders": []})
             with open(path) as f:
                 content = json.load(f)
-            assert len(content["reminders"]) > 0
+            assert content["reminders"] == []
+        finally:
+            os.unlink(path)
+
+    def test_save_none_payload_is_blocked(self):
+        """结构损坏的 payload（None / 空 dict）仍然拦截"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump({"reminders": [{"id": "x"}] * 50}, f)
+            f.flush()
+            path = f.name
+        try:
+            save_json(path, None)
+            save_json(path, {})
+            with open(path) as f:
+                content = json.load(f)
+            assert len(content["reminders"]) == 50
         finally:
             os.unlink(path)
 

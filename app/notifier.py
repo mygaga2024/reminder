@@ -2,12 +2,16 @@ import datetime
 import uuid
 import random
 import requests
+from functools import partial
 from app.config import logger, TIPS_LIST, TZ_ENV, LOG_RETENTION_DAYS
 from app.config import LOGS_FILE, CONFIG_FILE
 from app.calendar_utils import is_china_workday
 from app.persistence import save_json, db_lock
 from app import users
 from app import lunar_utils
+
+SUPPORTED_PLATFORMS = ("wecom", "dingtalk", "lark")
+GENERIC_PLATFORMS = ("sms_phone", "sms_api", "voice_api")
 
 
 def _repeat_label(rep: str) -> str:
@@ -129,26 +133,66 @@ def _send_webhooks(webhooks: dict, msg: str, reminder: dict) -> None:
     """发送所有配置的 webhook 通知"""
     title = reminder.get("title", "")
 
-    platform_handlers = {
-        "wecom": lambda url: requests.post(url, json={"msgtype": "text", "text": {"content": msg}}, timeout=10),
-        "dingtalk": lambda url: requests.post(url, json={"msgtype": "text", "text": {"content": msg}}, timeout=10),
-        "lark": lambda url: requests.post(url, json={"msg_type": "text", "content": {"text": msg}}, timeout=10),
-    }
-
     for platform, url in webhooks.items():
         if not url:
             continue
 
-        if platform in platform_handlers:
-            _send_with_retry(platform, url, platform_handlers[platform])
+        if platform in SUPPORTED_PLATFORMS:
+            _send_with_retry(platform, url, partial(_send_platform, platform, url, msg))
         elif platform in ("sms_phone", "sms_api", "voice_api"):
             _send_generic_webhook(platform, url, title, msg)
 
 
-def _send_with_retry(platform: str, url: str, send_fn) -> None:
-    """发送 webhook 并处理结果"""
+def _send_platform(platform: str, url: str, msg: str):
+    """按平台格式发送消息，返回 requests.Response"""
+    if platform in ("wecom", "dingtalk"):
+        return requests.post(url, json={"msgtype": "text", "text": {"content": msg}}, timeout=10)
+    if platform == "lark":
+        return requests.post(url, json={"msg_type": "text", "content": {"text": msg}}, timeout=10)
+    raise ValueError(f"不支持的平台: {platform}")
+
+
+def test_message(platform: str) -> str:
+    """测试推送文案"""
+    labels = {"wecom": "企业微信", "dingtalk": "钉钉", "lark": "飞书", "sms_phone": "短信/电话", "sms_api": "短信 API", "voice_api": "语音 API"}
+    now = datetime.datetime.now(TZ_ENV)
+    return (
+        "⏰ Life Reminder 测试推送\n\n"
+        f"收到这条消息说明「{labels.get(platform, platform)}」渠道配置正确。\n"
+        f"发送时间：{now.strftime('%Y-%m-%d %H:%M')}"
+    )
+
+
+def send_test_notification(platform: str, url: str) -> tuple:
+    """发送测试消息，返回 (是否成功, 提示信息)"""
+    if not url:
+        return False, "该渠道还没有配置 Webhook 地址"
+    if platform not in SUPPORTED_PLATFORMS and platform not in GENERIC_PLATFORMS:
+        return False, f"不支持的渠道: {platform}"
+
+    msg = test_message(platform)
     try:
-        resp = send_fn(url)
+        if platform in SUPPORTED_PLATFORMS:
+            resp = _send_platform(platform, url, msg)
+        else:
+            resp = requests.post(
+                url,
+                json={"title": "Life Reminder 测试推送", "message": msg, "channel": platform},
+                timeout=10
+            )
+        if resp.status_code == 200:
+            return True, "测试消息已发送，请到对应群聊/网关确认"
+        return False, f"推送失败：HTTP {resp.status_code}"
+    except requests.RequestException as e:
+        return False, f"网络错误：{e}"
+    except Exception as e:
+        return False, f"推送异常：{e}"
+
+
+def _send_with_retry(platform: str, url: str, send_fn) -> None:
+    """发送 webhook 并处理结果（send_fn 为无参可调用对象，url 仅用于日志上下文）"""
+    try:
+        resp = send_fn()
         if resp.status_code == 200:
             logger.info(f"推送成功 ({platform})")
         else:
