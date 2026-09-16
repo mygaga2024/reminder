@@ -453,9 +453,7 @@ input, select, button, textarea { font-family: inherit; }
     font-size: 0.7rem; color: var(--c-text3);
     line-height: 1.6;
 }
-#authStatus, #apiKeyStatus { display: block; }
-#apiKeyStatus { font-size: 0.66rem; opacity: 0.85; margin-bottom: 4px; }
-#apiKeyStatus:empty { display: none; }
+#authStatus { display: block; }
 
 /* ═══════════════════════════════════════════
    Bottom Dock
@@ -994,8 +992,7 @@ input, select, button, textarea { font-family: inherit; }
 
             <div class="footer-info">
                 <span id="authStatus"></span>
-                <span id="apiKeyStatus"></span>
-                Life Reminder v<span id="appVersion">3.2.23</span><br>
+                Life Reminder v<span id="appVersion">3.2.24</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -1987,7 +1984,7 @@ function paintSettings() {
     document.getElementById('w_sms_api').value = wh.sms_api || '';
     document.getElementById('w_voice_api').value = wh.voice_api || '';
 
-    // 安全状态：以「账号登录保护」为主，API Key 仅作补充说明
+    // 安全状态：只展示账号登录保护状态（API Key 状态可通过容器日志查看）
     const accountProtected = account.login_required === true;
     const authEl = document.getElementById('authStatus');
     if (authEl) {
@@ -1995,16 +1992,6 @@ function paintSettings() {
             authEl.innerHTML = '<i class="fas fa-shield-halved" style="color:var(--c-green)"></i> <span style="color:var(--c-green)">账号保护已启用</span>';
         } else {
             authEl.innerHTML = '<i class="fas fa-triangle-exclamation" style="color:var(--c-orange)"></i> <span style="color:var(--c-orange)">尚未启用登录保护，建议注册账号</span>';
-        }
-    }
-    const keyEl = document.getElementById('apiKeyStatus');
-    if (keyEl) {
-        if (S.auth_required) {
-            keyEl.textContent = 'API Key 已启用（脚本调用 /api 需携带密钥）';
-        } else if (accountProtected) {
-            keyEl.textContent = 'API Key 未启用（仅影响脚本直连 /api）';
-        } else {
-            keyEl.textContent = '';
         }
     }
 }
@@ -2382,6 +2369,7 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
+        { version: 'v3.2.24', changes: ['页脚仅保留账号保护状态，移除 API Key 相关提示'] },
         { version: 'v3.2.23', changes: ['优化设置页安全状态：账号保护已启用时不再显示「API 未认证」警告'] },
         { version: 'v3.2.22', changes: ['新增账号昵称：首页问候语显示', '设置页可修改昵称（留空恢复显示用户名），账号卡片同步显示'] },
         { version: 'v3.2.21', changes: ['修复开放模式下注册/登录页被 12 秒轮询强制关闭的问题', '登录页仅在拿到登录态时自动收起；增加「暂不注册，返回首页」入口'] },
