@@ -97,6 +97,67 @@ class TestAccounts:
         assert users.authenticate(db, "alice", "newpass123") == ("alice", None)
 
 
+class TestNickname:
+    """账号昵称（仅用于页面显示，不影响登录用户名）"""
+
+    def test_nickname_defaults_to_none(self):
+        db = make_db()
+        users.create_user(db, "alice", "secret123")
+        assert users.get_nickname(db, "alice") is None
+        assert users.public_user_info(db, "alice")["nickname"] is None
+
+    def test_set_nickname_trims_and_reads_back(self):
+        db = make_db()
+        users.create_user(db, "alice", "secret123")
+        nickname, error = users.set_nickname(db, "alice", "  小明  ")
+        assert error is None
+        assert nickname == "小明"
+        assert users.get_nickname(db, "alice") == "小明"
+
+    def test_clear_nickname_restores_username(self):
+        db = make_db()
+        users.create_user(db, "alice", "secret123")
+        users.set_nickname(db, "alice", "小明")
+
+        nickname, error = users.set_nickname(db, "alice", "   ")
+
+        assert error is None
+        assert nickname is None
+        assert users.get_nickname(db, "alice") is None
+        assert "nickname" not in db["users"]["alice"]
+
+    def test_nickname_length_limit(self):
+        db = make_db()
+        users.create_user(db, "alice", "secret123")
+        assert users.set_nickname(db, "alice", "长" * users.NICKNAME_MAX_LENGTH)[1] is None
+        assert users.set_nickname(db, "alice", "长" * (users.NICKNAME_MAX_LENGTH + 1))[1] is not None
+
+    def test_nickname_rejects_control_characters(self):
+        db = make_db()
+        users.create_user(db, "alice", "secret123")
+        assert users.set_nickname(db, "alice", "小\n明")[1] is not None
+        assert users.set_nickname(db, "alice", "小\t明")[1] is not None
+
+    def test_nickname_rejects_non_string(self):
+        db = make_db()
+        users.create_user(db, "alice", "secret123")
+        assert users.set_nickname(db, "alice", None)[1] is not None
+        assert users.set_nickname(db, "alice", 123)[1] is not None
+
+    def test_nickname_isolated_per_account(self):
+        db = make_db()
+        users.create_user(db, "alice", "secret123")
+        users.create_user(db, "bob", "secret123")
+        users.set_nickname(db, "alice", "小明")
+
+        assert users.get_nickname(db, "alice") == "小明"
+        assert users.get_nickname(db, "bob") is None
+
+    def test_set_nickname_unknown_account(self):
+        db = make_db()
+        assert users.set_nickname(db, "nobody", "小明") == (None, "账号不存在")
+
+
 class TestSessions:
     def test_session_lifecycle(self):
         db = make_db()

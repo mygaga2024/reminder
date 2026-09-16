@@ -235,6 +235,31 @@ def register_routes(app, db: dict, logs: list, scheduler):
                 logger.error(f"修改密码失败: {e}")
                 return jsonify({"error": "修改密码失败"}), 500
 
+    @app.route('/api/auth/profile', methods=['POST'])
+    @require_api_key
+    @require_login
+    def auth_update_profile():
+        """更新账号资料（当前支持昵称；昵称留空表示恢复显示用户名）"""
+        with db_lock:
+            try:
+                username = _username()
+                if not username:
+                    return jsonify({"error": "当前为开放模式，请先注册账号"}), 403
+
+                payload = request.json or {}
+                if "nickname" not in payload:
+                    return jsonify({"error": "没有需要更新的资料"}), 400
+
+                nickname, error = users.set_nickname(db, username, payload.get("nickname"))
+                if error:
+                    return jsonify({"error": error}), 400
+
+                save_json(CONFIG_FILE, db)
+                return jsonify({"status": "ok", "user": username, "nickname": nickname})
+            except Exception as e:
+                logger.error(f"更新账号资料失败: {e}")
+                return jsonify({"error": "更新账号资料失败"}), 500
+
     @app.route('/api/auth/claim-legacy', methods=['POST'])
     @require_api_key
     @require_login
@@ -284,6 +309,7 @@ def register_routes(app, db: dict, logs: list, scheduler):
 
                 status = _auth_status_payload()
                 status["user"] = username
+                status["nickname"] = users.get_nickname(db, username)
                 if username:
                     status["profile"] = users.public_user_info(db, username)
 

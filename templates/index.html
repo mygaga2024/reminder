@@ -129,7 +129,17 @@ input, select, button, textarea { font-family: inherit; }
     position: sticky; top: 0; z-index: 50;
     background: linear-gradient(var(--c-bg-veil) 55%, transparent);
 }
-.page-title { font-size: 2rem; font-weight: 800; letter-spacing: -0.5px; }
+.page-title {
+    font-size: 2rem; font-weight: 800; letter-spacing: -0.5px;
+    display: flex; align-items: baseline; min-width: 0;
+}
+.greeting-name {
+    display: none; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px;
+    color: var(--c-text); max-width: 58%;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.greeting-name::before { content: '，'; color: var(--c-text3); font-weight: 600; }
+.greeting-name.show { display: block; }
 
 /* ═══════════════════════════════════════════
    Components — Summary Cards
@@ -795,7 +805,9 @@ input, select, button, textarea { font-family: inherit; }
     <div class="screen">
         <!-- ═══ TAB 1: 首页 ═══ -->
         <div id="v-home" class="view active">
-            <div class="page-header"><h1 class="page-title" id="greetingText">晚上好</h1></div>
+            <div class="page-header">
+                <h1 class="page-title"><span id="greetingText">晚上好</span><span class="greeting-name" id="greetingName"></span></h1>
+            </div>
 
             <!-- Persistence Warning Banner -->
             <div id="persistWarning" class="persistence-warning">
@@ -910,8 +922,20 @@ input, select, button, textarea { font-family: inherit; }
                     <p id="acctMeta">0 项任务 · 0 项待办</p>
                 </div>
                 <div class="acct-actions">
+                    <button class="act-btn" title="设置昵称" onclick="openSheet('nickname')"><i class="fas fa-user-pen"></i></button>
                     <button class="act-btn edit" title="修改密码" onclick="openSheet('password')"><i class="fas fa-key"></i></button>
                     <button class="act-btn delete" title="退出登录" onclick="logout()"><i class="fas fa-arrow-right-from-bracket"></i></button>
+                </div>
+            </div>
+
+            <!-- 昵称设置 -->
+            <div class="settings-group" id="nicknameGroup" style="display:none">
+                <div class="set-item" onclick="openSheet('nickname')">
+                    <div class="set-left">
+                        <div class="set-icon" style="background:rgba(100,210,255,0.12); color:var(--c-teal)"><i class="fas fa-user-pen"></i></div>
+                        <div class="set-label"><h4>昵称</h4><p id="nicknameDesc">未设置（显示用户名）</p></div>
+                    </div>
+                    <div class="set-right"><i class="fas fa-chevron-right"></i></div>
                 </div>
             </div>
 
@@ -967,7 +991,7 @@ input, select, button, textarea { font-family: inherit; }
 
             <div class="footer-info">
                 <span id="authStatus"></span><br>
-                Life Reminder v<span id="appVersion">3.2.21</span><br>
+                Life Reminder v<span id="appVersion">3.2.22</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -1208,6 +1232,21 @@ input, select, button, textarea { font-family: inherit; }
         <div class="auth-error" id="pwError"></div>
         <button class="btn-submit" onclick="changePassword()">保存新密码</button>
     </div>
+
+    <!-- Nickname Sheet -->
+    <div class="sheet-panel" id="sheet-nickname" onclick="event.stopPropagation()">
+        <div class="sheet-header">
+            <div class="sheet-title">设置昵称</div>
+            <button class="sheet-close" onclick="closeSheet(true)"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="field">
+            <label>昵称</label>
+            <input type="text" id="nick_input" maxlength="20" placeholder="例如：小明">
+        </div>
+        <div class="auth-error" id="nickError"></div>
+        <button class="btn-submit" onclick="saveNickname()">保存昵称</button>
+        <p class="auth-hint">昵称仅用于页面显示（首页问候语），不改变登录用户名；留空即恢复显示用户名</p>
+    </div>
 </div>
 
 <!-- ═══════════════════════════════════════════
@@ -1385,6 +1424,30 @@ async function logout() {
     await openAuth('login');
 }
 
+async function saveNickname() {
+    const input = document.getElementById('nick_input');
+    const value = input.value.trim();
+    const box = document.getElementById('nickError');
+    const fail = (msg) => { box.textContent = msg; box.classList.add('show'); };
+    box.classList.remove('show');
+
+    if (value.length > 20) return fail('昵称不能超过 20 个字符');
+
+    try {
+        const res = await fetch('/api/auth/profile', {
+            method: 'POST', headers: apiHeaders(), body: JSON.stringify({ nickname: value })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return fail(data.error || '保存失败');
+        closeSheet();
+        await sync();
+        showToast(value ? '昵称已更新' : '已恢复显示用户名');
+    } catch(e) {
+        console.error('保存昵称失败', e);
+        fail('网络异常，请稍后重试');
+    }
+}
+
 async function claimLegacyData() {
     const legacy = (S && S.account && S.account.legacy) || {};
     const total = (legacy.reminders || 0) + (legacy.logs || 0);
@@ -1501,6 +1564,13 @@ function paintHome() {
     const g = h < 6 ? '夜深了' : h < 9 ? '早上好' : h < 12 ? '上午好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好';
     document.getElementById('greetingText').textContent = g;
 
+    // 多账号：问候语后跟上昵称（未设置昵称时显示用户名，开放模式不显示）
+    const account = S.account || {};
+    const displayName = account.nickname || account.user || '';
+    const nameEl = document.getElementById('greetingName');
+    nameEl.textContent = displayName;
+    nameEl.classList.toggle('show', !!displayName);
+
     // Hero
     document.getElementById('heroNext').textContent = pending.length > 0 ? pending[0].title : '今日任务已清空 ✨';
     document.getElementById('heroSub').textContent = `今日 ${doneCount}/${total} 已完成`;
@@ -1513,7 +1583,6 @@ function paintHome() {
     document.getElementById('totalCount').textContent = `共 ${total} 项`;
 
     // 多账号：开放模式提示（已登录或已有账号时隐藏）
-    const account = S.account || {};
     const prompt = document.getElementById('accountPrompt');
     if (prompt) {
         prompt.style.display = (account.login_required === false && !account.user) ? 'flex' : 'none';
@@ -1873,13 +1942,25 @@ function paintSettings() {
     const acctCard = document.getElementById('acctCard');
     if (account.user) {
         acctCard.style.display = 'flex';
-        document.getElementById('acctAvatar').textContent = account.user.slice(0, 1).toUpperCase();
-        document.getElementById('acctName').textContent = account.user;
+        const displayName = account.nickname || account.user;
+        document.getElementById('acctAvatar').textContent = displayName.slice(0, 1).toUpperCase();
+        document.getElementById('acctName').textContent = displayName;
         const profile = account.profile || {};
+        const prefix = account.nickname ? `@${account.user} · ` : '';
         document.getElementById('acctMeta').textContent =
-            `${profile.reminders || 0} 项任务 · ${profile.pending || 0} 项待办`;
+            `${prefix}${profile.reminders || 0} 项任务 · ${profile.pending || 0} 项待办`;
     } else {
         acctCard.style.display = 'none';
+    }
+
+    // 昵称入口：仅登录后可用
+    const nicknameGroup = document.getElementById('nicknameGroup');
+    if (account.user) {
+        nicknameGroup.style.display = 'block';
+        document.getElementById('nicknameDesc').textContent =
+            account.nickname ? `当前：${account.nickname}（留空可恢复用户名）` : '未设置（显示用户名）';
+    } else {
+        nicknameGroup.style.display = 'none';
     }
 
     // 未归属的遗留数据：允许登录后导入当前账号
@@ -2273,6 +2354,11 @@ function openSheet(id) {
         document.getElementById('pw_new').value = '';
         document.getElementById('pw_confirm').value = '';
     }
+    // 昵称面板：打开时带出当前昵称
+    if (id === 'nickname') {
+        document.getElementById('nickError').classList.remove('show');
+        document.getElementById('nick_input').value = (S && S.account && S.account.nickname) || '';
+    }
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('sheet-' + id).style.display = 'block';
 }
@@ -2280,6 +2366,7 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
+        { version: 'v3.2.22', changes: ['新增账号昵称：首页问候语显示「下午好，昵称」', '设置页可修改昵称（留空恢复显示用户名），账号卡片同步显示'] },
         { version: 'v3.2.21', changes: ['修复开放模式下注册/登录页被 12 秒轮询强制关闭的问题', '登录页仅在拿到登录态时自动收起；增加「暂不注册，返回首页」入口'] },
         { version: 'v3.2.20', changes: ['历史统计条改为后端全量统计，不再受 100 条列表上限影响', '历史记录超出展示上限时提示「仅展示最近 N 条」'] },
         { version: 'v3.2.19', changes: ['多账号：自助注册 / 登录 / 登出 / 改密，账号数据完全隔离', '账号安全：PBKDF2 密码哈希、会话 token 摘要存储、登录失败锁定', 'UI 改版：全新设计令牌、卡片与 Dock 视觉升级、浅色模式优化', '数据页去除柱状图，改为按日期分组的历史记录 + 统计条', '开放模式遗留数据可在设置页一键导入账号'] },

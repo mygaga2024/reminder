@@ -475,6 +475,72 @@ class TestMultiAccount:
         assert status["registration_enabled"] is True
 
 
+class TestNicknameEndpoint:
+    """昵称接口 /api/auth/profile"""
+
+    def register(self, client, username, password="secret123"):
+        resp = client.post('/api/auth/register', json={
+            "username": username, "password": password, "confirm": password
+        })
+        assert resp.status_code == 200, resp.get_json()
+        return resp.get_json()["token"]
+
+    def headers(self, token):
+        return {"X-Auth-Token": token}
+
+    def test_set_nickname_visible_in_state(self, client):
+        token = self.register(client, "alice")
+
+        resp = client.post('/api/auth/profile', headers=self.headers(token), json={"nickname": "小明"})
+        assert resp.status_code == 200
+        assert resp.get_json()["nickname"] == "小明"
+
+        state = client.get('/api/state', headers=self.headers(token)).get_json()
+        assert state["account"]["nickname"] == "小明"
+        assert state["account"]["user"] == "alice"
+        assert state["account"]["profile"]["nickname"] == "小明"
+
+    def test_clear_nickname(self, client):
+        token = self.register(client, "alice")
+        client.post('/api/auth/profile', headers=self.headers(token), json={"nickname": "小明"})
+
+        resp = client.post('/api/auth/profile', headers=self.headers(token), json={"nickname": ""})
+        assert resp.status_code == 200
+        assert resp.get_json()["nickname"] is None
+
+        state = client.get('/api/state', headers=self.headers(token)).get_json()
+        assert state["account"]["nickname"] is None
+
+    def test_nickname_too_long_rejected(self, client):
+        token = self.register(client, "alice")
+        resp = client.post('/api/auth/profile', headers=self.headers(token), json={"nickname": "长" * 21})
+        assert resp.status_code == 400
+
+    def test_missing_nickname_field_rejected(self, client):
+        token = self.register(client, "alice")
+        resp = client.post('/api/auth/profile', headers=self.headers(token), json={})
+        assert resp.status_code == 400
+
+    def test_profile_requires_login(self, client):
+        self.register(client, "alice")
+        resp = client.post('/api/auth/profile', json={"nickname": "小明"})
+        assert resp.status_code == 401
+
+    def test_profile_forbidden_in_open_mode(self, client):
+        resp = client.post('/api/auth/profile', json={"nickname": "小明"})
+        assert resp.status_code == 403
+
+    def test_nickname_isolated_between_accounts(self, client):
+        alice = self.register(client, "alice")
+        bob = self.register(client, "bob")
+        client.post('/api/auth/profile', headers=self.headers(alice), json={"nickname": "小明"})
+
+        alice_state = client.get('/api/state', headers=self.headers(alice)).get_json()
+        bob_state = client.get('/api/state', headers=self.headers(bob)).get_json()
+        assert alice_state["account"]["nickname"] == "小明"
+        assert bob_state["account"]["nickname"] is None
+
+
 class TestLogStats:
     """历史统计：按全量记录计算，不受返回列表长度上限影响"""
 

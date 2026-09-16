@@ -22,6 +22,7 @@ PASSWORD_ITERATIONS = 200000
 PASSWORD_SALT_BYTES = 16
 SESSION_TTL_DAYS = 30
 MAX_ACCOUNTS = 20
+NICKNAME_MAX_LENGTH = 20
 LOGIN_MAX_FAILURES = 5
 LOGIN_LOCK_SECONDS = 300
 
@@ -105,6 +106,17 @@ def validate_password(password: str, confirm: str = None):
         return f"密码长度不能超过{PASSWORD_MAX_LENGTH}位"
     if confirm is not None and password != confirm:
         return "两次输入的密码不一致"
+    return None
+
+
+def validate_nickname(nickname: str):
+    """校验昵称格式，返回错误信息或 None（空字符串表示清除昵称）"""
+    if not isinstance(nickname, str):
+        return "昵称格式无效"
+    if len(nickname) > NICKNAME_MAX_LENGTH:
+        return f"昵称长度不能超过{NICKNAME_MAX_LENGTH}个字符"
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in nickname):
+        return "昵称不能包含换行、制表符等控制字符"
     return None
 
 
@@ -215,6 +227,38 @@ def change_password(db: dict, username: str, old_password: str, new_password: st
     user["password_changed_at"] = _now().isoformat()
     logger.info(f"账号密码已更新: {username}")
     return None
+
+
+def get_nickname(db: dict, username: str):
+    """读取账号昵称，未设置或为空时返回 None"""
+    user = get_user(db, username)
+    if not isinstance(user, dict):
+        return None
+    nickname = user.get("nickname")
+    if isinstance(nickname, str) and nickname.strip():
+        return nickname.strip()
+    return None
+
+
+def set_nickname(db: dict, username: str, nickname):
+    """设置或清除账号昵称，返回 (nickname, error)"""
+    user = user_scope(db, username)
+    if not isinstance(user, dict):
+        return None, "账号不存在"
+    if nickname is None:
+        return None, "昵称格式无效"
+
+    cleaned = nickname.strip() if isinstance(nickname, str) else nickname
+    error = validate_nickname(cleaned)
+    if error:
+        return None, error
+
+    if cleaned:
+        user["nickname"] = cleaned
+    else:
+        user.pop("nickname", None)
+    logger.info(f"账号昵称已更新: {username} -> {cleaned or '（空，显示用户名）'}")
+    return (cleaned or None), None
 
 
 # ═══════════════════════════════════════════
@@ -475,6 +519,7 @@ def public_user_info(db: dict, username: str):
     reminders = user["reminders"]
     return {
         "username": username,
+        "nickname": get_nickname(db, username),
         "created_at": user.get("created_at"),
         "reminders": len(reminders),
         "pending": len([r for r in reminders if r.get("status") != "completed"]),
