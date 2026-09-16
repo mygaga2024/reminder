@@ -52,30 +52,43 @@ def update_scheduler(scheduler: BackgroundScheduler, db: dict, notify_fn) -> Non
 
 
 def _build_trigger(t_str: str, rep: str):
-    """根据时间字符串和重复模式构建触发器"""
-    if DATETIME_PATTERN.match(t_str):
-        target_dt = datetime.datetime.strptime(t_str, '%Y-%m-%d %H:%M')
-        target_dt = target_dt.replace(tzinfo=TZ_ENV)
-        if target_dt <= datetime.datetime.now(TZ_ENV):
-            target_dt += datetime.timedelta(days=1)
-        return DateTrigger(run_date=target_dt)
+    """根据时间字符串和重复模式构建触发器
 
-    elif TIME_PATTERN.match(t_str):
-        h, m = t_str.split(':')[:2]
-        if rep == "daily":
-            return CronTrigger(hour=h, minute=m)
-        elif rep.startswith("weekly:"):
-            days = rep.split(":")[1]
-            return CronTrigger(day_of_week=days, hour=h, minute=m)
-        elif rep == "workday":
-            return CronTrigger(hour=h, minute=m, day_of_week='mon-fri')
-        else:
-            target_datetime = datetime.datetime.combine(
-                datetime.date.today(), datetime.time(int(h), int(m))
-            )
-            target_datetime = target_datetime.replace(tzinfo=TZ_ENV)
-            if target_datetime <= datetime.datetime.now(TZ_ENV):
-                target_datetime += datetime.timedelta(days=1)
-            return DateTrigger(run_date=target_datetime)
+    时间值非法（如 25:00、不存在的日期）时返回 None，由调用方记录日志后跳过，
+    避免单条脏数据影响其他任务。
+    """
+    try:
+        if DATETIME_PATTERN.match(t_str):
+            target_dt = datetime.datetime.strptime(t_str, '%Y-%m-%d %H:%M')
+            target_dt = target_dt.replace(tzinfo=TZ_ENV)
+            if target_dt <= datetime.datetime.now(TZ_ENV):
+                target_dt += datetime.timedelta(days=1)
+            return DateTrigger(run_date=target_dt)
+
+        elif TIME_PATTERN.match(t_str):
+            h, m = t_str.split(':')[:2]
+            hour_val, minute_val = int(h), int(m)
+            if not (0 <= hour_val <= 23 and 0 <= minute_val <= 59):
+                logger.warning(f"提醒时间超出范围，已跳过调度: {t_str}")
+                return None
+
+            if rep == "daily":
+                return CronTrigger(hour=h, minute=m)
+            elif rep.startswith("weekly:"):
+                days = rep.split(":")[1]
+                return CronTrigger(day_of_week=days, hour=h, minute=m)
+            elif rep == "workday":
+                return CronTrigger(hour=h, minute=m, day_of_week='mon-fri')
+            else:
+                target_datetime = datetime.datetime.combine(
+                    datetime.date.today(), datetime.time(hour_val, minute_val)
+                )
+                target_datetime = target_datetime.replace(tzinfo=TZ_ENV)
+                if target_datetime <= datetime.datetime.now(TZ_ENV):
+                    target_datetime += datetime.timedelta(days=1)
+                return DateTrigger(run_date=target_datetime)
+    except (ValueError, TypeError, OverflowError) as e:
+        logger.warning(f"无法解析提醒时间，已跳过调度: {t_str} ({e})")
+        return None
 
     return None

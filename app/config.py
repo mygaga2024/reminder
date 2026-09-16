@@ -3,7 +3,7 @@ import re
 import logging
 import zoneinfo
 
-VERSION = "3.2.24"
+VERSION = "3.2.25"
 
 DATETIME_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$')
 TIME_PATTERN = re.compile(r'^\d{1,2}:\d{2}$')
@@ -66,6 +66,15 @@ API_KEY = os.getenv("API_KEY", "").strip()
 
 # 多账号：是否允许自助注册（false/0/no 关闭；关闭不影响已有账号登录）
 ALLOW_REGISTRATION = os.getenv("ALLOW_REGISTRATION", "true").strip().lower() not in ("false", "0", "no")
+
+# 通知记录保留天数（过期记录在下次推送时自动清理）
+try:
+    LOG_RETENTION_DAYS = int(os.getenv("LOG_RETENTION_DAYS", "30"))
+except (ValueError, TypeError, OverflowError):
+    print("⚠️ Warning: LOG_RETENTION_DAYS 配置无效，使用默认值 30")
+    LOG_RETENTION_DAYS = 30
+if LOG_RETENTION_DAYS < 1:
+    LOG_RETENTION_DAYS = 30
 
 try:
     TZ_ENV = zoneinfo.ZoneInfo(TZ)

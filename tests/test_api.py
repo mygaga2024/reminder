@@ -216,6 +216,31 @@ class TestValidation:
         resp = client.post('/api/settings', data=json.dumps(None), content_type='application/json')
         assert resp.status_code == 400
 
+    def test_invalid_time_format_rejected(self, client):
+        resp = client.post('/api/reminders', json={
+            "title": "非法时间", "time": "不是时间", "repeat": "daily"
+        })
+        assert resp.status_code == 400
+        assert "提醒时间格式无效" in resp.get_json()["error"]
+
+    def test_out_of_range_clock_rejected(self, client):
+        resp = client.post('/api/reminders', json={
+            "title": "越界时间", "time": "25:00", "repeat": "daily"
+        })
+        assert resp.status_code == 400
+
+    def test_nonexistent_date_rejected(self, client):
+        resp = client.post('/api/reminders', json={
+            "title": "不存在的日期", "time": "2026-02-30 10:00", "repeat": "once"
+        })
+        assert resp.status_code == 400
+
+    def test_valid_datetime_accepted(self, client):
+        resp = client.post('/api/reminders', json={
+            "title": "合法日期", "time": "2027-02-28 10:00", "repeat": "once"
+        })
+        assert resp.status_code == 200
+
 
 class TestAuth:
     @patch('app.auth.API_KEY', 'test-key-123')

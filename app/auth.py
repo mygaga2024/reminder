@@ -1,4 +1,5 @@
 import re
+import datetime
 from functools import wraps
 from flask import request, jsonify, g, current_app
 
@@ -63,6 +64,8 @@ def validate_reminder_input(data: dict) -> list:
         errors.append("提醒时间不能为空")
     elif len(time_val) > TIME_MAX_LENGTH:
         errors.append("提醒时间格式无效")
+    else:
+        errors.extend(validate_time_value(time_val))
 
     repeat = data.get("repeat", "daily")
     if repeat.startswith("weekly:"):
@@ -77,6 +80,38 @@ def validate_reminder_input(data: dict) -> list:
     if priority not in VALID_PRIORITIES:
         errors.append(f"优先级无效，允许的值: {', '.join(VALID_PRIORITIES)}")
 
+    return errors
+
+
+def validate_time_value(time_val: str) -> list:
+    """校验提醒时间值，返回错误列表
+
+    支持两种格式：
+    - HH:MM        （每日/每周/工作日/每月/每年等重复模式）
+    - YYYY-MM-DD HH:MM（一次性任务，以及每年/农历每年的月日来源）
+    """
+    errors = []
+
+    if DATETIME_PATTERN.match(time_val):
+        try:
+            datetime.datetime.strptime(time_val, "%Y-%m-%d %H:%M")
+        except ValueError:
+            errors.append("提醒日期无效，请检查日期是否存在")
+        return errors
+
+    if TIME_PATTERN.match(time_val):
+        hour, minute = time_val.split(":")[:2]
+        try:
+            hour_val = int(hour)
+            minute_val = int(minute)
+        except (ValueError, TypeError, OverflowError):
+            errors.append("提醒时间格式无效")
+            return errors
+        if not (0 <= hour_val <= 23 and 0 <= minute_val <= 59):
+            errors.append("提醒时间超出范围，应为 00:00 - 23:59")
+        return errors
+
+    errors.append("提醒时间格式无效，应为 HH:MM 或 YYYY-MM-DD HH:MM")
     return errors
 
 

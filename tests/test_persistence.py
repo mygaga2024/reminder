@@ -73,6 +73,54 @@ class TestSaveJson:
         finally:
             os.unlink(path)
 
+    def test_empty_reminders_with_account_data_is_written(self):
+        """多账号模式下 reminders 是派生视图，账号内有任务时应正常写入"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump({"reminders": [{"id": "x"}] * 50, "users": {}}, f)
+            f.flush()
+            path = f.name
+        try:
+            data = {
+                "reminders": [],
+                "users": {"alice": {"username": "alice", "reminders": [{"id": "a1"}]}},
+                "settings": {}
+            }
+            save_json(path, data)
+            with open(path) as f:
+                content = json.load(f)
+            assert content["users"]["alice"]["reminders"][0]["id"] == "a1"
+        finally:
+            os.unlink(path)
+
+    def test_empty_logs_list_is_written(self):
+        """用户删光全部通知记录是合法状态，空列表必须落盘"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump([{"id": "log-1", "title": "历史记录"}] * 20, f)
+            f.flush()
+            path = f.name
+        try:
+            assert os.path.getsize(path) > 100
+            save_json(path, [])
+            with open(path) as f:
+                content = json.load(f)
+            assert content == []
+        finally:
+            os.unlink(path)
+
+    def test_empty_dict_is_still_blocked(self):
+        """空 dict 仍视为异常数据，避免内存异常清空配置文件"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump({"reminders": [{"id": "x"}] * 50}, f)
+            f.flush()
+            path = f.name
+        try:
+            save_json(path, {})
+            with open(path) as f:
+                content = json.load(f)
+            assert content["reminders"]
+        finally:
+            os.unlink(path)
+
 
 class TestInitDb:
     def test_init_empty_db(self):

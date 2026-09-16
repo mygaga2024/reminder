@@ -2,11 +2,35 @@ import datetime
 import uuid
 import random
 import requests
-from app.config import logger, TIPS_LIST
+from app.config import logger, TIPS_LIST, TZ_ENV, LOG_RETENTION_DAYS
 from app.config import LOGS_FILE, CONFIG_FILE
 from app.calendar_utils import is_china_workday
 from app.persistence import save_json, db_lock
 from app import users
+
+
+def _parse_triggered_at(value):
+    """解析历史触发时间，兼容历史无时区数据；无法解析返回 None"""
+    if not value:
+        return None
+    try:
+        parsed = datetime.datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=TZ_ENV)
+    return parsed
+
+
+def _prune_logs(logs: list, now: datetime.datetime, days: int = LOG_RETENTION_DAYS) -> list:
+    """按保留期清理历史记录（无法解析时间的记录保留，避免误删）"""
+    cutoff = now - datetime.timedelta(days=days)
+    kept = []
+    for entry in logs:
+        triggered = _parse_triggered_at(entry.get("triggered_at")) if isinstance(entry, dict) else None
+        if triggered is None or triggered >= cutoff:
+            kept.append(entry)
+    return kept
 
 
 def notify_engine(reminder: dict, db: dict, logs: list, scheduler=None) -> None:
@@ -24,7 +48,7 @@ def notify_engine(reminder: dict, db: dict, logs: list, scheduler=None) -> None:
             # 多账号：Webhook 配置取自提醒归属账号，开放模式回落顶层设置
             s = users.owned_settings(db, reminder)
             title = reminder.get("title", "未命名提醒")
-            now = datetime.datetime.now()
+            now = datetime.datetime.now(TZ_ENV)
             date_str = now.strftime('%Y年%m月%d日')
             time_str = now.strftime('%H:%M')
 
@@ -47,14 +71,14 @@ def notify_engine(reminder: dict, db: dict, logs: list, scheduler=None) -> None:
                 "reminder_id": reminder.get("id", "unknown"),
                 "user": reminder.get("user"),
                 "title": title,
-                "triggered_at": datetime.datetime.now().isoformat(),
+                "triggered_at": now.isoformat(),
                 "completed_at": None,
                 "status": "triggered"
             }
             logs.append(log_entry)
 
-            cutoff = (datetime.datetime.now() - datetime.timedelta(days=30)).isoformat()
-            logs[:] = [l for l in logs if l.get("triggered_at", "") > cutoff]
+            # 保留期清理：兼容历史无时区数据，避免字符串比较导致的误删
+            logs[:] = _prune_logs(logs, now)
 
             save_json(LOGS_FILE, logs)
             logger.info(f"提醒已触发: {title}")

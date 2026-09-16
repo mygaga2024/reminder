@@ -6,7 +6,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import datetime
 from unittest.mock import MagicMock, patch, call
 from app.notifier import notify_engine, _send_generic_webhook
+from app.notifier import _prune_logs
 from app.calendar_utils import is_china_workday
+from app.config import TZ_ENV
 
 
 class TestNotifyEngine:
@@ -201,3 +203,49 @@ class TestMultiAccountNotify:
         assert db["users"]["alice"]["reminders"] == []
         assert db["reminders"] == []
         scheduler.remove_job.assert_called_once_with("reminder-alice-1")
+
+
+class TestLogRetention:
+    """通知记录保留期清理（兼容历史无时区数据）"""
+
+    def make_now(self):
+        return datetime.datetime(2026, 9, 16, 12, 0, tzinfo=TZ_ENV)
+
+    def test_recent_records_are_kept(self):
+        now = self.make_now()
+        logs = [
+            {"id": "new", "triggered_at": (now - datetime.timedelta(days=3)).isoformat()},
+            {"id": "old", "triggered_at": (now - datetime.timedelta(days=40)).isoformat()},
+        ]
+
+        kept = _prune_logs(logs, now)
+
+        assert [l["id"] for l in kept] == ["new"]
+
+    def test_legacy_naive_timestamp_is_pruned_correctly(self):
+        now = self.make_now()
+        logs = [
+            {"id": "legacy-old", "triggered_at": "2026-01-05T09:00:00.123456"},
+            {"id": "legacy-new", "triggered_at": "2026-09-15T09:00:00.123456"},
+        ]
+
+        kept = _prune_logs(logs, now)
+
+        assert [l["id"] for l in kept] == ["legacy-new"]
+
+    def test_unparsable_timestamp_is_kept(self):
+        now = self.make_now()
+        logs = [{"id": "broken", "triggered_at": "未知时间"}, {"id": "missing"}]
+
+        kept = _prune_logs(logs, now)
+
+        assert [l["id"] for l in kept] == ["broken", "missing"]
+
+    def test_notify_engine_writes_timezone_aware_timestamp(self):
+        db = {"settings": {"webhooks": {}}, "reminders": [], "users": {}}
+        logs = []
+
+        notify_engine({"id": "r1", "title": "时区测试", "time": "10:00", "repeat": "daily"}, db, logs, MagicMock())
+
+        parsed = datetime.datetime.fromisoformat(logs[0]["triggered_at"])
+        assert parsed.tzinfo is not None

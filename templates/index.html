@@ -992,7 +992,7 @@ input, select, button, textarea { font-family: inherit; }
 
             <div class="footer-info">
                 <span id="authStatus"></span>
-                Life Reminder v<span id="appVersion">3.2.24</span><br>
+                Life Reminder v<span id="appVersion">3.2.25</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -2019,12 +2019,10 @@ async function clearCompletedTasks() {
 }
 
 async function doAction(id, type) {
-    if (type === 'delete' && !confirm('确认删除该任务？')) return;
-    await fetch(`/api/reminders/${id}`, {
-        method: type === 'delete' ? 'DELETE' : 'PUT',
-        headers: apiHeaders(),
-        body: type === 'toggle' ? JSON.stringify({ status: 'completed' }) : null
-    });
+    // 目前仅用于删除任务（完成/恢复由 toggleStatus 处理）
+    if (type !== 'delete') return;
+    if (!confirm('确认删除该任务？')) return;
+    await fetch(`/api/reminders/${id}`, { method: 'DELETE', headers: apiHeaders() });
     sync();
 }
 
@@ -2270,7 +2268,7 @@ async function createTask() {
         const res = await fetch('/api/reminders', {
             method: 'POST',
             headers: apiHeaders(),
-            body: JSON.stringify({ title, time: finalTime, priority: prio, repeat, category: 'work' })
+            body: JSON.stringify({ title, time: finalTime, priority: prio, repeat })
         });
         const created = await res.json();
         window.newTaskId = created.id;
@@ -2369,6 +2367,7 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
+        { version: 'v3.2.25', changes: ['修复：删除全部通知记录后未落盘（重启会恢复）的问题', '修复：非法时间/不存在日期会被静默保存的问题，改为明确提示', '通知记录改为按保留期安全清理，兼容历史时间格式', '新增 LOG_RETENTION_DAYS 环境变量（默认 30 天）'] },
         { version: 'v3.2.24', changes: ['页脚仅保留账号保护状态，移除 API Key 相关提示'] },
         { version: 'v3.2.23', changes: ['优化设置页安全状态：账号保护已启用时不再显示「API 未认证」警告'] },
         { version: 'v3.2.22', changes: ['新增账号昵称：首页问候语显示', '设置页可修改昵称（留空恢复显示用户名），账号卡片同步显示'] },
