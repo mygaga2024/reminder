@@ -728,6 +728,78 @@ class TestWebhookTest:
         assert mock_post.call_args[0][0] == "https://saved.example.com"
 
 
+class TestAccountMaintenance:
+    """账号运维：退出其他设备、注销账号"""
+
+    def test_logout_all_keeps_current_device(self, client):
+        alice = register_account(client, "alice")
+        second = {"X-Auth-Token": client.post('/api/auth/login', json={
+            "username": "alice", "password": "secret123"
+        }).get_json()["token"]}
+
+        resp = client.post('/api/auth/logout-all', headers=alice)
+        assert resp.status_code == 200
+        assert resp.get_json()["removed"] == 2
+
+        # 旧会话全部失效，返回的新 token 可用
+        assert client.get('/api/state', headers=alice).status_code == 401
+        assert client.get('/api/state', headers=second).status_code == 401
+        fresh = {"X-Auth-Token": resp.get_json()["token"]}
+        assert client.get('/api/state', headers=fresh).status_code == 200
+
+    def test_logout_all_requires_login(self, client):
+        register_account(client, "alice")
+        assert client.post('/api/auth/logout-all').status_code == 401
+
+    def test_delete_account_requires_confirm_username(self, client):
+        headers = register_account(client, "alice")
+        resp = client.delete('/api/auth/account', headers=headers,
+                              json={"password": "secret123", "confirm_username": "bob"})
+        assert resp.status_code == 400
+
+    def test_delete_account_requires_password(self, client):
+        headers = register_account(client, "alice")
+        resp = client.delete('/api/auth/account', headers=headers,
+                              json={"password": "wrong-pass", "confirm_username": "alice"})
+        assert resp.status_code == 400
+        assert client.get('/api/state', headers=headers).status_code == 200
+
+    def test_delete_account_removes_data_and_sessions(self, client, app):
+        alice = register_account(client, "alice")
+        client.post('/api/reminders', headers=alice, json={
+            "title": "alice 的任务", "time": "10:00", "repeat": "daily", "priority": "low"
+        })
+        app.config['GLOBAL_LOGS'] = [
+            {"id": "log-a", "title": "alice", "user": "alice", "triggered_at": "2026-09-16T09:00:00+08:00"}
+        ]
+
+        resp = client.delete('/api/auth/account', headers=alice,
+                              json={"password": "secret123", "confirm_username": "alice"})
+
+        assert resp.status_code == 200
+        result = resp.get_json()
+        assert result["reminders_deleted"] == 1
+        assert result["logs_deleted"] == 1
+        assert result["remaining_accounts"] == 0
+        assert app.config['GLOBAL_LOGS'] == []
+        assert app.config['GLOBAL_DB']['reminders'] == []
+        assert client.get('/api/state', headers=alice).status_code == 200  # 回到开放模式
+
+    def test_delete_account_keeps_other_accounts(self, client):
+        alice = register_account(client, "alice")
+        bob = register_account(client, "bob")
+        client.post('/api/reminders', headers=bob, json={
+            "title": "bob 的任务", "time": "11:00", "repeat": "daily", "priority": "low"
+        })
+
+        resp = client.delete('/api/auth/account', headers=alice,
+                              json={"password": "secret123", "confirm_username": "alice"})
+
+        assert resp.get_json()["remaining_accounts"] == 1
+        bob_state = client.get('/api/state', headers=bob).get_json()
+        assert [r["title"] for r in bob_state["db"]["reminders"]] == ["bob 的任务"]
+
+
 class TestBackup:
     """数据导出 / 导入"""
 

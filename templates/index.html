@@ -581,6 +581,23 @@ input, select, button, textarea { font-family: inherit; }
 }
 .btn-secondary:active { transform: scale(0.97); background: var(--c-border); }
 .btn-secondary:disabled { opacity: 0.6; cursor: default; }
+.btn-danger {
+    width: 100%; padding: 16px; border: none; border-radius: 14px;
+    background: var(--c-red); color: #fff;
+    font-size: 1rem; font-weight: 700; cursor: pointer;
+    margin-top: 8px; transition: var(--transition);
+}
+.btn-danger:active { transform: scale(0.97); opacity: 0.9; }
+.danger-note {
+    background: rgba(255,69,58,0.1);
+    border: 1px solid rgba(255,69,58,0.3);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 18px;
+    font-size: 0.8rem;
+    color: var(--c-red);
+    line-height: 1.6;
+}
 
 /* Calendar Picker */
 .cal-wrap {
@@ -947,6 +964,20 @@ input, select, button, textarea { font-family: inherit; }
                     </div>
                     <div class="set-right"><i class="fas fa-chevron-right"></i></div>
                 </div>
+                <div class="set-item" onclick="logoutAllDevices()">
+                    <div class="set-left">
+                        <div class="set-icon" style="background:rgba(10,132,255,0.12); color:var(--c-blue)"><i class="fas fa-right-from-bracket"></i></div>
+                        <div class="set-label"><h4>退出其他设备</h4><p>当前设备保持登录，其他设备需重新登录</p></div>
+                    </div>
+                    <div class="set-right"><i class="fas fa-chevron-right"></i></div>
+                </div>
+                <div class="set-item" onclick="openSheet('deleteAccount')">
+                    <div class="set-left">
+                        <div class="set-icon" style="background:rgba(255,69,58,0.12); color:var(--c-red)"><i class="fas fa-user-minus"></i></div>
+                        <div class="set-label"><h4 style="color:var(--c-red)">注销账号</h4><p>删除账号及其全部数据，不可恢复</p></div>
+                    </div>
+                    <div class="set-right"><i class="fas fa-chevron-right"></i></div>
+                </div>
             </div>
 
             <!-- 遗留数据导入（注册时未继承时显示） -->
@@ -1020,7 +1051,7 @@ input, select, button, textarea { font-family: inherit; }
 
             <div class="footer-info">
                 <span id="authStatus"></span>
-                Life Reminder v<span id="appVersion">3.2.27</span><br>
+                Life Reminder v<span id="appVersion">3.2.28</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -1274,6 +1305,27 @@ input, select, button, textarea { font-family: inherit; }
         <button class="btn-submit" onclick="changePassword()">保存新密码</button>
     </div>
 
+    <!-- Delete Account Sheet -->
+    <div class="sheet-panel" id="sheet-deleteAccount" onclick="event.stopPropagation()">
+        <div class="sheet-header">
+            <div class="sheet-title" style="color:var(--c-red)">注销账号</div>
+            <button class="sheet-close" onclick="closeSheet(true)"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="danger-note" id="deleteAccountNote">
+            注销后将永久删除该账号及其 <strong>全部提醒与通知记录</strong>，且无法恢复。
+        </div>
+        <div class="field">
+            <label>输入用户名确认</label>
+            <input type="text" id="del_username" placeholder="请输入当前用户名" autocomplete="off">
+        </div>
+        <div class="field">
+            <label>登录密码</label>
+            <input type="password" id="del_password" placeholder="请输入当前密码" autocomplete="current-password">
+        </div>
+        <div class="auth-error" id="delError"></div>
+        <button class="btn-danger" onclick="deleteAccount()">确认注销账号</button>
+    </div>
+
     <!-- Nickname Sheet -->
     <div class="sheet-panel" id="sheet-nickname" onclick="event.stopPropagation()">
         <div class="sheet-header">
@@ -1449,6 +1501,61 @@ async function submitAuth() {
         authError('网络异常，请稍后重试');
     } finally {
         btn.disabled = false;
+    }
+}
+
+async function logoutAllDevices() {
+    if (!confirm('确认退出其他设备？当前设备保持登录，其他设备需要重新登录。')) return;
+    try {
+        const res = await fetch('/api/auth/logout-all', { method: 'POST', headers: apiHeaders() });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            showToast(data.error || '操作失败', 'times-circle', 'var(--c-red)');
+            return;
+        }
+        if (data.token) setToken(data.token);
+        showToast(`已退出其他设备（${data.removed} 个会话）`);
+    } catch(e) {
+        console.error('退出其他设备失败', e);
+        showToast('操作失败', 'times-circle', 'var(--c-red)');
+    }
+}
+
+async function deleteAccount() {
+    const box = document.getElementById('delError');
+    const fail = (msg) => { box.textContent = msg; box.classList.add('show'); };
+    box.classList.remove('show');
+
+    const confirmName = document.getElementById('del_username').value.trim();
+    const password = document.getElementById('del_password').value;
+    const currentUser = (S && S.account && S.account.user) || '';
+    if (!confirmName) return fail('请输入用户名以确认注销');
+    if (confirmName !== currentUser) return fail('用户名与当前账号不一致');
+    if (!password) return fail('请输入登录密码');
+    if (!confirm('最后确认：账号及其全部提醒与历史都会被永久删除，继续？')) return;
+
+    try {
+        const res = await fetch('/api/auth/account', {
+            method: 'DELETE', headers: apiHeaders(),
+            body: JSON.stringify({ password, confirm_username: confirmName })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return fail(data.error || '注销失败');
+
+        closeSheet();
+        setToken('');
+        S = null;
+        hideAuth();
+        showToast(`账号已注销（删除提醒 ${data.reminders_deleted} 条、记录 ${data.logs_deleted} 条）`, 'user-minus', 'var(--c-red)');
+        if (data.remaining_accounts > 0) {
+            await openAuth('login');
+        } else {
+            authStatus = null;
+            await sync();
+        }
+    } catch(e) {
+        console.error('注销账号失败', e);
+        fail('网络异常，请稍后重试');
     }
 }
 
@@ -2664,6 +2771,12 @@ function openSheet(id) {
         document.getElementById('nickError').classList.remove('show');
         document.getElementById('nick_input').value = (S && S.account && S.account.nickname) || '';
     }
+    // 注销账号面板：清空上次输入
+    if (id === 'deleteAccount') {
+        document.getElementById('delError').classList.remove('show');
+        document.getElementById('del_username').value = '';
+        document.getElementById('del_password').value = '';
+    }
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('sheet-' + id).style.display = 'block';
 }
@@ -2671,6 +2784,7 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
+        { version: 'v3.2.28', changes: ['新增：退出其他设备（当前设备保持登录）', '新增：注销账号（密码 + 用户名二次确认，数据一并删除）'] },
         { version: 'v3.2.27', changes: ['新增：Webhook 测试推送按钮（配置后立即验证）', '新增：历史记录一键「稍后提醒」（10 分钟后）', '新增：历史记录「标记已处理」开关', '新增：数据导出 / 导入备份（去重合并，不覆盖现有数据）', '修复：删除最后一条提醒不被落盘（重启复活）的问题'] },
         { version: 'v3.2.26', changes: ['新增「每月」提醒（指定日期或每月最后一天）', '新增「每年」提醒（生日、纪念日等）', '新增「农历每年」提醒（支持农历生日、闰月）', '修正通知文案中每周提醒被显示为「每天」的问题'] },
         { version: 'v3.2.25', changes: ['修复：删除全部通知记录后未落盘（重启会恢复）的问题', '修复：非法时间/不存在日期会被静默保存的问题，改为明确提示', '通知记录改为按保留期安全清理，兼容历史时间格式', '新增 LOG_RETENTION_DAYS 环境变量（默认 30 天）'] },

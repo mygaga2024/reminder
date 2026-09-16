@@ -268,6 +268,68 @@ def register_routes(app, db: dict, logs: list, scheduler):
                 logger.error(f"更新账号资料失败: {e}")
                 return jsonify({"error": "更新账号资料失败"}), 500
 
+    @app.route('/api/auth/logout-all', methods=['POST'])
+    @require_api_key
+    @require_login
+    def auth_logout_all():
+        """退出其他设备：注销该账号全部会话，并给当前设备签发新会话"""
+        with db_lock:
+            try:
+                username = _username()
+                if not username:
+                    return jsonify({"error": "当前为开放模式，请先注册账号"}), 403
+
+                removed = users.destroy_user_sessions(db, username)
+                token = users.create_session(db, username)
+                save_json(CONFIG_FILE, db)
+                logger.info(f"退出其他设备: {username} (注销 {removed} 个会话)")
+                return jsonify({"status": "ok", "token": token, "removed": removed})
+            except Exception as e:
+                logger.error(f"退出其他设备失败: {e}")
+                return jsonify({"error": "退出其他设备失败"}), 500
+
+    @app.route('/api/auth/account', methods=['DELETE'])
+    @require_api_key
+    @require_login
+    def auth_delete_account():
+        """注销账号：需密码 + 用户名二次确认，账号内提醒与通知记录一并删除"""
+        with db_lock:
+            try:
+                username = _username()
+                if not username:
+                    return jsonify({"error": "当前为开放模式，无需注销账号"}), 403
+
+                payload = request.json or {}
+                confirm_name = (payload.get("confirm_username") or "").strip()
+                if confirm_name != username:
+                    return jsonify({"error": "请输入完整用户名以确认注销"}), 400
+
+                ok, error, reminder_count = users.delete_account(db, username, payload.get("password", ""))
+                if not ok:
+                    return jsonify({"error": error}), 400
+
+                g_logs = app.config['GLOBAL_LOGS']
+                before_logs = len(g_logs)
+                g_logs[:] = [l for l in g_logs if l.get("user") != username]
+                if before_logs != len(g_logs):
+                    save_json(LOGS_FILE, g_logs)
+
+                _persist()
+                update_scheduler(scheduler, db, _make_notify_fn(app))
+                logger.info(
+                    f"账号注销完成: {username} (提醒 {reminder_count} 条, "
+                    f"通知记录 {before_logs - len(g_logs)} 条)"
+                )
+                return jsonify({
+                    "status": "ok",
+                    "reminders_deleted": reminder_count,
+                    "logs_deleted": before_logs - len(g_logs),
+                    "remaining_accounts": users.account_count(db)
+                })
+            except Exception as e:
+                logger.error(f"注销账号失败: {e}")
+                return jsonify({"error": "注销账号失败"}), 500
+
     @app.route('/api/auth/claim-legacy', methods=['POST'])
     @require_api_key
     @require_login

@@ -229,6 +229,23 @@ def change_password(db: dict, username: str, old_password: str, new_password: st
     return None
 
 
+def delete_account(db: dict, username: str, password: str):
+    """注销账号：校验密码后删除账号记录与其会话，返回 (是否成功, 错误信息, 提醒数量)"""
+    user = get_user(db, username)
+    if not isinstance(user, dict) or not user.get("password_hash"):
+        return False, "账号不存在", 0
+    if not verify_password(password or "", user):
+        logger.warning(f"注销账号失败（密码错误）: {username}")
+        return False, "密码不正确", 0
+
+    reminder_count = len(user.get("reminders") or [])
+    users_map(db).pop(username, None)
+    destroy_user_sessions(db, username)
+    rebuild_flat_reminders(db)
+    logger.info(f"账号已注销: {username}（同时移除 {reminder_count} 条提醒）")
+    return True, None, reminder_count
+
+
 def get_nickname(db: dict, username: str):
     """读取账号昵称，未设置或为空时返回 None"""
     user = get_user(db, username)
