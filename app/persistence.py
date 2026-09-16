@@ -220,14 +220,30 @@ def load_json(filepath: str, default):
 
 def save_json(filepath: str, data) -> None:
     """保存 JSON — 多重降级策略，NAS 环境自动适配"""
-    if not data or (isinstance(data, dict) and "reminders" in data and len(data["reminders"]) == 0):
-        if os.path.exists(filepath) and os.path.getsize(filepath) > 100:
-            logger.error(f"拦截空数据写入: {filepath}")
-            return
+    if _is_empty_payload(data) and os.path.exists(filepath) and os.path.getsize(filepath) > 100:
+        logger.error(f"拦截空数据写入: {filepath}")
+        return
 
     with db_lock:
         if not _atomic_write(filepath, data):
             raise IOError(f"持久化失败: {filepath}")
+
+
+def _is_empty_payload(data) -> bool:
+    """空数据判定：多账号模式下 reminders 为派生视图，账号内有数据时不算空"""
+    if not data:
+        return True
+    if not isinstance(data, dict) or "reminders" not in data:
+        return False
+    if len(data["reminders"]) > 0:
+        return False
+
+    users_map = data.get("users")
+    if isinstance(users_map, dict):
+        for user in users_map.values():
+            if isinstance(user, dict) and user.get("reminders"):
+                return False
+    return True
 
 
 def init_db(db: dict, logs: list) -> tuple:

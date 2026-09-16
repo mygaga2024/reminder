@@ -15,6 +15,7 @@ os.environ["API_KEY"] = ""
 from flask import Flask
 from flask_cors import CORS
 from app.api import register_routes
+from app import users
 
 
 @pytest.fixture
@@ -231,3 +232,244 @@ class TestWxLogin:
     def test_missing_env_config_fails(self, client):
         resp = client.post('/api/wxlogin', json={"code": "test-code"})
         assert resp.status_code == 400
+
+
+@pytest.fixture(autouse=True)
+def clear_login_locks():
+    """避免登录失败计数在用例之间串扰"""
+    yield
+    users._login_failures.clear()
+
+
+class TestMultiAccount:
+    """多账号注册登录与数据隔离"""
+
+    def register(self, client, username, password="secret123", **extra):
+        payload = {"username": username, "password": password, "confirm": password}
+        payload.update(extra)
+        resp = client.post('/api/auth/register', json=payload)
+        assert resp.status_code == 200, resp.get_json()
+        return resp.get_json()["token"]
+
+    def headers(self, token):
+        return {"X-Auth-Token": token}
+
+    def test_open_mode_before_any_account(self, client):
+        status = client.get('/api/auth/status').get_json()
+        assert status["login_required"] is False
+        assert status["accounts"] == 0
+        assert client.get('/api/state').status_code == 200
+
+    def test_login_required_after_registration(self, client):
+        token = self.register(client, "alice")
+        assert client.get('/api/state').status_code == 401
+        assert client.get('/api/state').get_json()["code"] == "unauthenticated"
+
+        state = client.get('/api/state', headers=self.headers(token))
+        assert state.status_code == 200
+        assert state.get_json()["account"]["user"] == "alice"
+
+    def test_login_returns_token(self, client):
+        self.register(client, "alice")
+        resp = client.post('/api/auth/login', json={"username": "alice", "password": "secret123"})
+        assert resp.status_code == 200
+        assert resp.get_json()["username"] == "alice"
+        assert resp.get_json()["token"]
+
+    def test_login_with_wrong_password_fails(self, client):
+        self.register(client, "bob")
+        resp = client.post('/api/auth/login', json={"username": "bob", "password": "wrong-pass"})
+        assert resp.status_code == 401
+
+    def test_duplicate_registration_rejected(self, client):
+        self.register(client, "carol")
+        resp = client.post('/api/auth/register', json={
+            "username": "carol", "password": "secret123", "confirm": "secret123"
+        })
+        assert resp.status_code == 400
+
+    def test_invalid_credentials_rejected(self, client):
+        resp = client.post('/api/auth/register', json={
+            "username": "a", "password": "123", "confirm": "123"
+        })
+        assert resp.status_code == 400
+
+    def test_reminders_are_isolated(self, client):
+        alice = self.register(client, "alice")
+        bob = self.register(client, "bob")
+
+        client.post('/api/reminders', headers=self.headers(alice), json={
+            "title": "alice 的任务", "time": "10:00", "repeat": "daily", "priority": "low"
+        })
+        client.post('/api/reminders', headers=self.headers(bob), json={
+            "title": "bob 的任务", "time": "11:00", "repeat": "daily", "priority": "low"
+        })
+
+        alice_state = client.get('/api/state', headers=self.headers(alice)).get_json()
+        bob_state = client.get('/api/state', headers=self.headers(bob)).get_json()
+
+        assert [r["title"] for r in alice_state["db"]["reminders"]] == ["alice 的任务"]
+        assert [r["title"] for r in bob_state["db"]["reminders"]] == ["bob 的任务"]
+        assert alice_state["db"]["reminders"][0]["user"] == "alice"
+        assert bob_state["db"]["reminders"][0]["user"] == "bob"
+
+    def test_cross_account_modification_blocked(self, client):
+        alice = self.register(client, "alice")
+        bob = self.register(client, "bob")
+
+        created = client.post('/api/reminders', headers=self.headers(alice), json={
+            "title": "alice 的任务", "time": "10:00", "repeat": "daily", "priority": "low"
+        }).get_json()
+
+        resp = client.delete(f'/api/reminders/{created["id"]}', headers=self.headers(bob))
+        assert resp.status_code == 404
+
+        resp = client.put(f'/api/reminders/{created["id"]}', headers=self.headers(bob), json={
+            "title": "被篡改", "time": "10:00", "repeat": "daily", "priority": "low"
+        })
+        assert resp.status_code == 404
+
+        alice_state = client.get('/api/state', headers=self.headers(alice)).get_json()
+        assert alice_state["db"]["reminders"][0]["title"] == "alice 的任务"
+
+    def test_settings_are_isolated(self, client):
+        alice = self.register(client, "alice")
+        bob = self.register(client, "bob")
+
+        client.post('/api/settings', headers=self.headers(alice), json={
+            "dark_mode": False, "webhooks": {"wecom": "https://alice.example.com"}
+        })
+
+        alice_state = client.get('/api/state', headers=self.headers(alice)).get_json()
+        bob_state = client.get('/api/state', headers=self.headers(bob)).get_json()
+
+        assert alice_state["db"]["settings"]["webhooks"]["wecom"] == "https://alice.example.com"
+        assert bob_state["db"]["settings"]["webhooks"]["wecom"] == ""
+
+    def test_logs_are_isolated(self, client, app):
+        alice = self.register(client, "alice")
+        bob = self.register(client, "bob")
+        app.config['GLOBAL_LOGS'] = [
+            {"id": "log-a", "title": "alice 记录", "user": "alice", "triggered_at": "2026-01-01T10:00:00"},
+            {"id": "log-b", "title": "bob 记录", "user": "bob", "triggered_at": "2026-01-01T11:00:00"}
+        ]
+
+        alice_state = client.get('/api/state', headers=self.headers(alice)).get_json()
+        assert [l["id"] for l in alice_state["logs"]] == ["log-a"]
+
+        resp = client.delete('/api/logs/log-b', headers=self.headers(alice))
+        assert resp.status_code == 200
+        assert resp.get_json()["deleted"] == 0
+        assert [l["id"] for l in app.config['GLOBAL_LOGS']] == ["log-a", "log-b"]
+
+    def test_clear_completed_only_affects_own_account(self, client):
+        alice = self.register(client, "alice")
+        bob = self.register(client, "bob")
+
+        alice_task = client.post('/api/reminders', headers=self.headers(alice), json={
+            "title": "alice 已完成", "time": "10:00", "repeat": "daily", "priority": "low"
+        }).get_json()
+        bob_task = client.post('/api/reminders', headers=self.headers(bob), json={
+            "title": "bob 已完成", "time": "11:00", "repeat": "daily", "priority": "low"
+        }).get_json()
+        for token, task in ((alice, alice_task), (bob, bob_task)):
+            client.put(f'/api/reminders/{task["id"]}', headers=self.headers(token), json={
+                "title": task["title"], "time": task["time"], "repeat": "daily",
+                "priority": "low", "status": "completed"
+            })
+
+        resp = client.post('/api/reminders/clear-completed', headers=self.headers(alice))
+        assert resp.status_code == 200
+        assert resp.get_json()["deleted"] == 1
+
+        alice_state = client.get('/api/state', headers=self.headers(alice)).get_json()
+        bob_state = client.get('/api/state', headers=self.headers(bob)).get_json()
+        assert alice_state["db"]["reminders"] == []
+        assert [r["title"] for r in bob_state["db"]["reminders"]] == ["bob 已完成"]
+
+    def test_state_never_exposes_password_hash(self, client, app):
+        self.register(client, "alice")
+        state = client.get('/api/state', headers=self.headers(
+            client.post('/api/auth/login', json={"username": "alice", "password": "secret123"}).get_json()["token"]
+        )).get_json()
+
+        serialized = json.dumps(state, ensure_ascii=False)
+        assert "password_hash" not in serialized
+        assert "sessions" not in serialized
+
+    def test_first_account_can_claim_legacy_data(self, client, app):
+        app.config['GLOBAL_DB']["reminders"] = [
+            {"id": "legacy-1", "title": "遗留任务", "time": "09:00", "repeat": "daily", "status": "pending"}
+        ]
+        app.config['GLOBAL_LOGS'] = [
+            {"id": "log-legacy", "reminder_id": "legacy-1", "title": "遗留任务", "triggered_at": "2026-01-01T09:00:00"}
+        ]
+
+        token = self.register(client, "alice", claim_legacy=True)
+        state = client.get('/api/state', headers=self.headers(token)).get_json()
+
+        assert [r["id"] for r in state["db"]["reminders"]] == ["legacy-1"]
+        assert [l["id"] for l in state["logs"]] == ["log-legacy"]
+        assert app.config['GLOBAL_DB']['users']['alice']['reminders'][0]["user"] == "alice"
+
+    def test_logout_invalidates_session(self, client):
+        token = self.register(client, "alice")
+        assert client.get('/api/state', headers=self.headers(token)).status_code == 200
+
+        resp = client.post('/api/auth/logout', headers=self.headers(token))
+        assert resp.status_code == 200
+        assert client.get('/api/state', headers=self.headers(token)).status_code == 401
+
+    def test_claim_legacy_endpoint_after_registration(self, client, app):
+        app.config['GLOBAL_DB']["reminders"] = [
+            {"id": "legacy-1", "title": "遗留任务", "time": "09:00", "repeat": "daily", "status": "pending"}
+        ]
+        app.config['GLOBAL_LOGS'] = [
+            {"id": "log-legacy", "reminder_id": "legacy-1", "title": "遗留任务", "triggered_at": "2026-01-01T09:00:00"}
+        ]
+
+        token = self.register(client, "alice")
+        state = client.get('/api/state', headers=self.headers(token)).get_json()
+        assert state["db"]["reminders"] == []
+        assert state["account"]["legacy"]["reminders"] == 1
+
+        resp = client.post('/api/auth/claim-legacy', headers=self.headers(token))
+        assert resp.status_code == 200
+        assert resp.get_json() == {"status": "ok", "reminders": 1, "logs": 1}
+
+        state = client.get('/api/state', headers=self.headers(token)).get_json()
+        assert [r["id"] for r in state["db"]["reminders"]] == ["legacy-1"]
+        assert [l["id"] for l in state["logs"]] == ["log-legacy"]
+        assert state["account"]["legacy"] == {"reminders": 0, "logs": 0}
+
+    def test_claim_legacy_without_data_fails(self, client):
+        token = self.register(client, "alice")
+        resp = client.post('/api/auth/claim-legacy', headers=self.headers(token))
+        assert resp.status_code == 400
+
+    def test_change_password_rotates_token(self, client):
+        token = self.register(client, "alice")
+        resp = client.post('/api/auth/password', headers=self.headers(token), json={
+            "old_password": "secret123", "new_password": "newpass123", "confirm": "newpass123"
+        })
+        assert resp.status_code == 200
+        new_token = resp.get_json()["token"]
+
+        assert client.get('/api/state', headers=self.headers(token)).status_code == 401
+        assert client.get('/api/state', headers=self.headers(new_token)).status_code == 200
+        assert client.post('/api/auth/login', json={
+            "username": "alice", "password": "newpass123"
+        }).status_code == 200
+
+    def test_change_password_rejects_wrong_old_password(self, client):
+        token = self.register(client, "alice")
+        resp = client.post('/api/auth/password', headers=self.headers(token), json={
+            "old_password": "wrong", "new_password": "newpass123", "confirm": "newpass123"
+        })
+        assert resp.status_code == 400
+
+    def test_status_reports_claimable_legacy_data(self, client, app):
+        app.config['GLOBAL_DB']["reminders"] = [{"id": "legacy-1", "title": "遗留"}]
+        status = client.get('/api/auth/status').get_json()
+        assert status["legacy"]["reminders"] == 1
+        assert status["registration_enabled"] is True

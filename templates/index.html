@@ -6,7 +6,6 @@
     <title>Life Reminder</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lunar-javascript/lunar.js"></script>
     <style>
@@ -30,6 +29,12 @@
     --radius: 16px;
     --radius-lg: 24px;
     --transition: 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --grad-primary: linear-gradient(135deg, #0A84FF 0%, #5856D6 50%, #BF5AF2 100%);
+    --grad-surface: linear-gradient(158deg, rgba(255,255,255,0.055), rgba(255,255,255,0.012));
+    --c-bg-veil: rgba(4,6,12,0.72);
+    --ring-focus: 0 0 0 3px rgba(10,132,255,0.18);
+    --shadow-card: 0 12px 30px -16px rgba(0,0,0,0.85);
+    --shadow-float: 0 22px 48px -22px rgba(0,0,0,0.9);
 }
 
 [data-theme="light"] {
@@ -40,6 +45,10 @@
     --c-text: #1C1C1E;
     --c-text2: #636366;
     --c-text3: #AEAEB2;
+    --grad-surface: linear-gradient(158deg, rgba(255,255,255,0.9), rgba(255,255,255,0.55));
+    --c-bg-veil: rgba(242,242,247,0.78);
+    --shadow-card: 0 12px 30px -20px rgba(60,60,67,0.32);
+    --shadow-float: 0 22px 48px -24px rgba(60,60,67,0.35);
 }
 
 /* ═══════════════════════════════════════════
@@ -49,7 +58,7 @@
 html { font-size: 16px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 body {
     font-family: 'Inter', -apple-system, sans-serif;
-    background: #000;
+    background: radial-gradient(120% 70% at 50% 0%, #14203a 0%, #05060a 55%, #000 100%);
     color: var(--c-text);
     height: 100vh;
     display: flex; justify-content: center; align-items: center;
@@ -65,7 +74,10 @@ input, select, button, textarea { font-family: inherit; }
 .shell {
     width: 100vw; max-width: 430px;
     height: 96vh; max-height: 920px;
-    background: var(--c-bg);
+    background:
+        radial-gradient(120% 55% at 50% -10%, rgba(10,132,255,0.16) 0%, transparent 60%),
+        radial-gradient(90% 45% at 110% 105%, rgba(191,90,242,0.10) 0%, transparent 60%),
+        var(--c-bg);
     border-radius: 44px;
     border: 6px solid #1a1a1a;
     display: flex; flex-direction: column;
@@ -74,6 +86,12 @@ input, select, button, textarea { font-family: inherit; }
     box-shadow:
         0 0 0 2px rgba(255,255,255,0.04),
         0 40px 80px -20px rgba(0,0,0,0.8);
+}
+[data-theme="light"] .shell {
+    background:
+        radial-gradient(120% 55% at 50% -10%, rgba(10,132,255,0.14) 0%, transparent 62%),
+        radial-gradient(90% 45% at 110% 105%, rgba(191,90,242,0.08) 0%, transparent 62%),
+        var(--c-bg);
 }
 
 /* Status Bar */
@@ -109,7 +127,7 @@ input, select, button, textarea { font-family: inherit; }
 .page-header {
     padding: 8px 0 20px;
     position: sticky; top: 0; z-index: 50;
-    background: linear-gradient(var(--c-bg) 70%, transparent);
+    background: linear-gradient(var(--c-bg-veil) 55%, transparent);
 }
 .page-title { font-size: 2rem; font-weight: 800; letter-spacing: -0.5px; }
 
@@ -119,12 +137,13 @@ input, select, button, textarea { font-family: inherit; }
 .summary-row { display: flex; gap: 12px; margin-bottom: 20px; }
 .summary-card {
     flex: 1;
-    background: var(--c-surface);
+    background: var(--grad-surface), var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: var(--radius);
     padding: 16px;
     transition: var(--transition);
     text-align: center;
+    box-shadow: var(--shadow-card);
 }
 .summary-card.wide {
     padding: 20px 16px;
@@ -149,22 +168,29 @@ input, select, button, textarea { font-family: inherit; }
 
 /* Progress Ring */
 .hero-banner {
-    background: linear-gradient(135deg, #0A84FF 0%, #5856D6 50%, #BF5AF2 100%);
+    background: var(--grad-primary);
     border-radius: var(--radius-lg);
     padding: 24px;
     margin-bottom: 24px;
     color: #fff;
     display: flex; justify-content: space-between; align-items: center;
     position: relative; overflow: hidden;
+    box-shadow: 0 20px 40px -22px rgba(88,86,214,0.9);
 }
 .hero-banner::before {
     content: ''; position: absolute; top: -40px; right: -30px;
     width: 140px; height: 140px; border-radius: 50%;
     background: rgba(255,255,255,0.08);
 }
+.hero-banner::after {
+    content: ''; position: absolute; bottom: -50px; left: -20px;
+    width: 120px; height: 120px; border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+}
 .hero-text h3 { font-size: 0.85rem; font-weight: 500; opacity: 0.85; margin-bottom: 6px; }
 .hero-text h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 12px; max-width: 200px; word-break: break-all; }
-.hero-progress { position: relative; }
+.hero-text { position: relative; z-index: 1; }
+.hero-progress { position: relative; z-index: 1; }
 .hero-progress svg { width: 70px; height: 70px; transform: rotate(-90deg); }
 .hero-progress circle { fill: none; stroke-width: 6; stroke-linecap: round; }
 .ring-bg { stroke: rgba(255,255,255,0.15); }
@@ -185,7 +211,7 @@ input, select, button, textarea { font-family: inherit; }
 .section-count { font-size: 0.7rem; font-weight: 700; color: var(--c-blue); }
 
 .task {
-    background: var(--c-surface);
+    background: var(--grad-surface), var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: var(--radius);
     padding: 16px;
@@ -195,6 +221,7 @@ input, select, button, textarea { font-family: inherit; }
     position: relative;
     overflow: hidden;
     cursor: grab;
+    box-shadow: var(--shadow-card);
 }
 .task::before {
     content: ''; position: absolute; left: 0; top: 0; bottom: 0;
@@ -227,38 +254,79 @@ input, select, button, textarea { font-family: inherit; }
 .drag-handle { color: var(--c-text3); font-size: 0.75rem; cursor: grab; padding: 4px; opacity: 0.4; }
 
 .empty-state {
-    text-align: center; padding: 60px 20px; color: var(--c-text3);
+    text-align: center; padding: 48px 20px; color: var(--c-text3);
+    border: 1px dashed var(--c-border); border-radius: var(--radius-lg);
+    background: var(--grad-surface);
 }
 .empty-state i { font-size: 3.5rem; opacity: 0.15; margin-bottom: 16px; display: block; }
-.empty-state p { font-size: 0.9rem; }
+.empty-state p { font-size: 0.85rem; line-height: 1.7; }
 
 /* ═══════════════════════════════════════════
-   Components — Stats / Log Actions
+   Components — History (历史数据)
    ═══════════════════════════════════════════ */
-.chart-wrap {
-    background: var(--c-surface);
+.hist-strip {
+    display: flex; align-items: stretch;
+    background: var(--grad-surface), var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: var(--radius-lg);
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 16px 8px;
+    margin-bottom: 22px;
+    box-shadow: var(--shadow-card);
 }
-.chart-wrap h4 { font-size: 0.75rem; color: var(--c-text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+.hist-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.hist-value {
+    font-size: 1.35rem; font-weight: 800; letter-spacing: -0.5px;
+    font-family: 'JetBrains Mono', monospace;
+}
+.hist-item.today .hist-value { color: var(--c-blue); }
+.hist-item.total .hist-value { color: var(--c-text); }
+.hist-item.done  .hist-value { color: var(--c-green); }
+.hist-label { font-size: 0.62rem; font-weight: 700; color: var(--c-text3); text-transform: uppercase; letter-spacing: 0.6px; }
+.hist-sep { width: 1px; background: var(--c-border); margin: 4px 0; }
+
+.log-group { margin-bottom: 22px; }
+.log-group-head {
+    display: flex; align-items: center; gap: 8px;
+    margin: 0 4px 10px;
+    font-size: 0.7rem; font-weight: 700; color: var(--c-text3);
+    text-transform: uppercase; letter-spacing: 0.8px;
+}
+.log-group-head .bar {
+    width: 3px; height: 12px; border-radius: 3px;
+    background: var(--grad-primary);
+}
+.log-group-head .cnt { color: var(--c-blue); font-weight: 800; letter-spacing: 0; }
 
 .log-entry {
     display: flex; align-items: center; gap: 12px;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--c-border);
+    background: var(--grad-surface), var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 8px;
     transition: var(--transition);
+    box-shadow: var(--shadow-card);
 }
+.log-entry:active { transform: scale(0.985); background: var(--c-surface2); }
 .log-entry.hidden-log { display: none; }
 .show-hidden .log-entry.hidden-log { display: flex; opacity: 0.4; }
-.toggle-hidden-btn { font-size: 0.7rem; color: var(--c-blue); cursor: pointer; font-weight: 600; user-select: none; }
+.toggle-hidden-btn { font-size: 0.7rem; color: var(--c-text3); cursor: pointer; font-weight: 600; user-select: none; }
+.toggle-hidden-btn.on { color: var(--c-blue); }
 .log-icon {
     width: 38px; height: 38px; border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
     font-size: 0.85rem; flex-shrink: 0;
 }
-.log-icon.triggered { background: rgba(10,132,255,0.12); color: var(--c-blue); }
+.log-icon.triggered {
+    background: rgba(10,132,255,0.14); color: var(--c-blue);
+    box-shadow: inset 0 0 0 1px rgba(10,132,255,0.16);
+}
+.log-status {
+    font-size: 0.62rem; font-weight: 700; padding: 2px 8px;
+    border-radius: 100px; letter-spacing: 0.2px;
+}
+.log-status.pending { background: rgba(10,132,255,0.12); color: var(--c-blue); }
+.log-status.done { background: rgba(48,209,88,0.12); color: var(--c-green); }
 
 /* Custom Premium Dropdown */
 .sort-container { position: relative; }
@@ -388,13 +456,14 @@ input, select, button, textarea { font-family: inherit; }
     height: auto;
     min-height: 56px;
     padding: 8px 6px;
-    background: rgba(28,28,30,0.75);
+    background: rgba(28,28,30,0.72);
     backdrop-filter: blur(30px) saturate(180%);
     -webkit-backdrop-filter: blur(30px) saturate(180%);
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 20px;
     display: flex; align-items: center;
     justify-content: space-around;
+    box-shadow: var(--shadow-float);
 }
 [data-theme="light"] .dock-inner {
     background: rgba(255,255,255,0.75);
@@ -587,6 +656,113 @@ input, select, button, textarea { font-family: inherit; }
     cursor: pointer;
 }
 
+/* ═══════════════════════════════════════════
+   Components — Accounts (多账号)
+   ═══════════════════════════════════════════ */
+.account-prompt {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: rgba(10,132,255,0.08);
+    border: 1px solid rgba(10,132,255,0.25);
+    border-radius: 14px;
+    padding: 12px 14px;
+    margin-bottom: 20px;
+    color: var(--c-text);
+}
+.account-prompt i { font-size: 1.2rem; color: var(--c-blue); }
+.account-prompt strong { display: block; font-size: 0.82rem; }
+.account-prompt span { display: block; font-size: 0.72rem; color: var(--c-text3); margin-top: 2px; }
+.account-prompt button {
+    margin-left: auto; flex-shrink: 0;
+    background: var(--c-blue); color: #fff; border: none;
+    padding: 6px 12px; border-radius: 10px;
+    font-size: 0.75rem; font-weight: 700; cursor: pointer;
+}
+
+.acct-card {
+    display: none;
+    align-items: center;
+    gap: 14px;
+    background: var(--grad-surface), var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow-card);
+}
+.acct-avatar {
+    width: 44px; height: 44px; border-radius: 14px; flex-shrink: 0;
+    background: var(--grad-primary); color: #fff;
+    font-weight: 800; font-size: 1.05rem;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 12px 24px -14px rgba(88,86,214,0.9);
+}
+.acct-info { flex: 1; min-width: 0; }
+.acct-info h4 { font-size: 0.95rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acct-info p { font-size: 0.72rem; color: var(--c-text3); margin-top: 3px; }
+.acct-actions { display: flex; gap: 2px; flex-shrink: 0; }
+
+.auth-screen {
+    position: absolute; inset: 0; z-index: 2000;
+    display: none; flex-direction: column;
+    background:
+        radial-gradient(120% 55% at 50% -10%, rgba(10,132,255,0.22) 0%, transparent 62%),
+        radial-gradient(90% 40% at 110% 108%, rgba(191,90,242,0.16) 0%, transparent 62%),
+        var(--c-bg);
+    padding: 44px 26px 32px;
+    overflow-y: auto;
+}
+.auth-screen.show { display: flex; animation: viewEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.auth-brand { text-align: center; margin: 8px 0 26px; }
+.auth-logo {
+    width: 62px; height: 62px; border-radius: 20px; margin: 0 auto 14px;
+    background: var(--grad-primary); color: #fff; font-size: 1.5rem;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 18px 36px -16px rgba(88,86,214,0.9);
+}
+.auth-brand h2 { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.5px; }
+.auth-brand p { font-size: 0.78rem; color: var(--c-text3); margin-top: 6px; }
+.auth-card {
+    background: var(--grad-surface), var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow-card);
+}
+.auth-tabs {
+    display: flex; gap: 6px;
+    background: var(--c-bg); border-radius: 14px;
+    padding: 4px; margin-bottom: 20px;
+}
+.auth-tab {
+    flex: 1; padding: 10px; border: none; border-radius: 11px;
+    background: transparent; color: var(--c-text3);
+    font-size: 0.85rem; font-weight: 700; cursor: pointer;
+    transition: var(--transition);
+}
+.auth-tab.active { background: var(--c-surface2); color: var(--c-text); }
+.auth-tab:focus { outline: none; }
+.auth-tab:focus-visible { box-shadow: var(--ring-focus); }
+.auth-card .field label { text-transform: none; letter-spacing: 0.2px; }
+.auth-error {
+    display: none;
+    margin-bottom: 14px; padding: 10px 14px; border-radius: 12px;
+    background: rgba(255,69,58,0.12); color: var(--c-red);
+    font-size: 0.78rem; font-weight: 600; line-height: 1.5;
+}
+.auth-error.show { display: block; }
+.auth-hint { font-size: 0.72rem; color: var(--c-text3); text-align: center; margin-top: 16px; line-height: 1.7; }
+.claim-row {
+    display: none;
+    align-items: flex-start; gap: 10px;
+    background: var(--c-bg); border: 1px solid var(--c-border);
+    border-radius: 12px; padding: 12px; margin-bottom: 18px;
+    font-size: 0.78rem; color: var(--c-text2); line-height: 1.5;
+    cursor: pointer;
+}
+.claim-row input { width: 16px; height: 16px; accent-color: var(--c-blue); margin-top: 1px; flex-shrink: 0; }
+
     </style>
 </head>
 <body>
@@ -614,6 +790,16 @@ input, select, button, textarea { font-family: inherit; }
                     <span style="font-size:0.75rem; opacity:0.8">请检查极空间共享文件夹权限</span>
                 </div>
                 <button class="fix-btn" onclick="goTo('logs', document.querySelectorAll('.dock-btn')[3])">查看日志</button>
+            </div>
+
+            <!-- Account Prompt (开放模式提示) -->
+            <div id="accountPrompt" class="account-prompt">
+                <i class="fas fa-user-shield"></i>
+                <div>
+                    <strong>尚未启用账号体系</strong>
+                    <span>注册账号后可多人共用，数据各自隔离</span>
+                </div>
+                <button onclick="openRegister()">去注册</button>
             </div>
 
             <div class="hero-banner">
@@ -664,15 +850,27 @@ input, select, button, textarea { font-family: inherit; }
 
         <!-- ═══ TAB 2: 数据 ═══ -->
         <div id="v-data" class="view">
-            <div class="page-header"><h1 class="page-title">执行数据</h1></div>
-            <div class="chart-wrap">
-                <h4>本周完成趋势</h4>
-                <canvas id="weekChart" height="160"></canvas>
+            <div class="page-header"><h1 class="page-title">历史数据</h1></div>
+            <div class="hist-strip">
+                <div class="hist-item today">
+                    <span class="hist-value" id="histToday">0</span>
+                    <span class="hist-label">今日通知</span>
+                </div>
+                <div class="hist-sep"></div>
+                <div class="hist-item total">
+                    <span class="hist-value" id="histTotal">0</span>
+                    <span class="hist-label">累计记录</span>
+                </div>
+                <div class="hist-sep"></div>
+                <div class="hist-item done">
+                    <span class="hist-value" id="histDone">0</span>
+                    <span class="hist-label">已处理</span>
+                </div>
             </div>
             <div class="section-head">
                 <div class="section-title">通知记录</div>
                 <div style="display:flex; gap:8px; align-items:center;">
-                    <span class="toggle-hidden-btn" id="toggleHiddenBtn" onclick="toggleHiddenLogs()" style="color:var(--c-text3)">显示已隐藏</span>
+                    <span class="toggle-hidden-btn" id="toggleHiddenBtn" onclick="toggleHiddenLogs()">显示已隐藏</span>
                     <span onclick="clearCompletedTasks()" style="color:var(--c-red); font-size:0.7rem; font-weight:600; cursor:pointer; background:rgba(255,69,58,0.08); padding:4px 10px; border-radius:8px;">一键清空</span>
                 </div>
             </div>
@@ -688,6 +886,30 @@ input, select, button, textarea { font-family: inherit; }
         <!-- ═══ TAB 4: 设置 ═══ -->
         <div id="v-config" class="view">
             <div class="page-header"><h1 class="page-title">设置</h1></div>
+
+            <!-- 当前账号卡片 -->
+            <div class="acct-card" id="acctCard">
+                <div class="acct-avatar" id="acctAvatar">U</div>
+                <div class="acct-info">
+                    <h4 id="acctName">账号</h4>
+                    <p id="acctMeta">0 项任务 · 0 项待办</p>
+                </div>
+                <div class="acct-actions">
+                    <button class="act-btn edit" title="修改密码" onclick="openSheet('password')"><i class="fas fa-key"></i></button>
+                    <button class="act-btn delete" title="退出登录" onclick="logout()"><i class="fas fa-arrow-right-from-bracket"></i></button>
+                </div>
+            </div>
+
+            <!-- 遗留数据导入（注册时未继承时显示） -->
+            <div class="settings-group" id="legacyGroup" style="display:none">
+                <div class="set-item" onclick="claimLegacyData()">
+                    <div class="set-left">
+                        <div class="set-icon" style="background:rgba(255,159,10,0.12); color:var(--c-orange)"><i class="fas fa-box-archive"></i></div>
+                        <div class="set-label"><h4>导入遗留数据</h4><p id="legacyDesc">未归属任何账号的数据</p></div>
+                    </div>
+                    <div class="set-right"><i class="fas fa-chevron-right"></i></div>
+                </div>
+            </div>
 
             <div class="settings-group">
                 <div class="set-item" onclick="toggleDark()">
@@ -730,7 +952,7 @@ input, select, button, textarea { font-family: inherit; }
 
             <div class="footer-info">
                 <span id="authStatus"></span><br>
-                Life Reminder v<span id="appVersion">3.2.18</span><br>
+                Life Reminder v<span id="appVersion">3.2.19</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
@@ -740,10 +962,44 @@ input, select, button, textarea { font-family: inherit; }
     <div class="dock">
         <div class="dock-inner">
             <button class="dock-btn active" onclick="goTo('home',this)"><i class="fas fa-house"></i><span>首页</span></button>
-            <button class="dock-btn" onclick="goTo('data',this)"><i class="fas fa-chart-bar"></i><span>数据</span></button>
+            <button class="dock-btn" onclick="goTo('data',this)"><i class="fas fa-clock-rotate-left"></i><span>历史</span></button>
             <button class="dock-fab" onclick="openSheet('add')"><i class="fas fa-plus"></i></button>
             <button class="dock-btn" onclick="goTo('logs',this)"><i class="fas fa-terminal"></i><span>日志</span></button>
             <button class="dock-btn" onclick="goTo('config',this)"><i class="fas fa-gear"></i><span>设置</span></button>
+        </div>
+    </div>
+
+    <!-- ═══ Auth Screen (多账号登录 / 注册) ═══ -->
+    <div class="auth-screen" id="authScreen">
+        <div class="auth-brand">
+            <div class="auth-logo"><i class="fas fa-bell"></i></div>
+            <h2>Life Reminder</h2>
+            <p id="authSubtitle">登录后查看你的提醒</p>
+        </div>
+        <div class="auth-card">
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tab-login" onclick="switchAuth('login')">登录</button>
+                <button class="auth-tab" id="tab-register" onclick="switchAuth('register')">注册</button>
+            </div>
+            <div class="field">
+                <label>用户名</label>
+                <input type="text" id="auth_user" placeholder="2-32 位中文 / 字母 / 数字" autocomplete="username">
+            </div>
+            <div class="field">
+                <label>密码</label>
+                <input type="password" id="auth_pass" placeholder="至少 6 位" autocomplete="current-password">
+            </div>
+            <div class="field" id="authConfirmField" style="display:none">
+                <label>确认密码</label>
+                <input type="password" id="auth_pass2" placeholder="再次输入密码" autocomplete="new-password">
+            </div>
+            <label class="claim-row" id="authClaim">
+                <input type="checkbox" id="authClaimBox">
+                <span>继承当前（未登录模式）下的提醒与历史记录</span>
+            </label>
+            <div class="auth-error" id="authError"></div>
+            <button class="btn-submit" id="authSubmit" onclick="submitAuth()">登录</button>
+            <p class="auth-hint" id="authHint">账号数据相互隔离，互不可见</p>
         </div>
     </div>
 </div>
@@ -914,6 +1170,28 @@ input, select, button, textarea { font-family: inherit; }
         </div>
         <div class="sheet-content" id="sheet-about-content"></div>
     </div>
+
+    <!-- Password Sheet -->
+    <div class="sheet-panel" id="sheet-password" onclick="event.stopPropagation()">
+        <div class="sheet-header">
+            <div class="sheet-title">修改密码</div>
+            <button class="sheet-close" onclick="closeSheet(true)"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="field">
+            <label>原密码</label>
+            <input type="password" id="pw_old" placeholder="请输入当前密码" autocomplete="current-password">
+        </div>
+        <div class="field">
+            <label>新密码</label>
+            <input type="password" id="pw_new" placeholder="至少 6 位" autocomplete="new-password">
+        </div>
+        <div class="field">
+            <label>确认新密码</label>
+            <input type="password" id="pw_confirm" placeholder="再次输入新密码" autocomplete="new-password">
+        </div>
+        <div class="auth-error" id="pwError"></div>
+        <button class="btn-submit" onclick="changePassword()">保存新密码</button>
+    </div>
 </div>
 
 <!-- ═══════════════════════════════════════════
@@ -921,7 +1199,6 @@ input, select, button, textarea { font-family: inherit; }
      ═══════════════════════════════════════════ -->
 <script>
 let S = null; // global state
-let weekChart = null;
 // API Key: 通过 URL 参数 ?api_key=xxx 设置，或 localStorage 持久化
 const API_KEY = (() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -932,7 +1209,197 @@ const API_KEY = (() => {
 function apiHeaders() {
     const headers = { 'Content-Type': 'application/json' };
     if (API_KEY) headers['X-API-Key'] = API_KEY;
+    const token = getToken();
+    if (token) headers['X-Auth-Token'] = token;
     return headers;
+}
+
+// ─── Auth (多账号) ───
+const TOKEN_KEY = 'reminder_token';
+let authMode = 'login';
+let authStatus = null;
+
+function getToken() { return localStorage.getItem(TOKEN_KEY) || ''; }
+function setToken(token) {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+}
+
+async function fetchAuthStatus() {
+    try {
+        const res = await fetch('/api/auth/status', { headers: apiHeaders() });
+        if (!res.ok) return null;
+        return await res.json();
+    } catch(e) {
+        console.error('账号状态获取失败', e);
+        return null;
+    }
+}
+
+function authError(msg) {
+    const box = document.getElementById('authError');
+    if (!box) return;
+    box.textContent = msg || '';
+    box.classList.toggle('show', !!msg);
+}
+
+function switchAuth(mode) {
+    const isRegister = mode === 'register' && authStatus && authStatus.registration_enabled !== false;
+    authMode = isRegister ? 'register' : 'login';
+    const registering = authMode === 'register';
+    document.getElementById('tab-login').classList.toggle('active', !registering);
+    document.getElementById('tab-register').classList.toggle('active', registering);
+    document.getElementById('authConfirmField').style.display = registering ? 'block' : 'none';
+    document.getElementById('authSubmit').textContent = registering ? '注册并登录' : '登录';
+    document.getElementById('auth_pass').setAttribute('autocomplete', registering ? 'new-password' : 'current-password');
+    paintAuthOptions();
+    authError('');
+}
+
+function paintAuthOptions() {
+    const status = authStatus || {};
+    const legacy = status.legacy || { reminders: 0, logs: 0 };
+    const hasLegacy = (legacy.reminders || 0) + (legacy.logs || 0) > 0;
+    const registering = authMode === 'register';
+    const allowed = status.registration_enabled !== false;
+
+    document.getElementById('tab-register').style.display = allowed ? 'block' : 'none';
+    const claimRow = document.getElementById('authClaim');
+    claimRow.style.display = (registering && hasLegacy) ? 'flex' : 'none';
+    document.getElementById('authClaimBox').checked = registering && hasLegacy;
+
+    const subtitle = document.getElementById('authSubtitle');
+    if (status.accounts === 0) subtitle.textContent = '首次使用：创建你的账号';
+    else subtitle.textContent = registering ? '创建新账号，数据与其他账号隔离' : '登录后查看你的提醒';
+
+    const hint = document.getElementById('authHint');
+    if (registering && hasLegacy) hint.textContent = '勾选后可把当前未登录模式下的提醒与历史迁移到新账号';
+    else if (allowed) hint.textContent = '账号数据相互隔离，互不可见';
+    else hint.textContent = '管理员已关闭自助注册';
+}
+
+async function openAuth(mode, status) {
+    authStatus = status || await fetchAuthStatus() || {
+        accounts: 1, login_required: true, registration_enabled: true, legacy: { reminders: 0, logs: 0 }
+    };
+    document.getElementById('authScreen').classList.add('show');
+    switchAuth(mode || (authStatus.accounts === 0 ? 'register' : 'login'));
+}
+
+function openRegister() { openAuth('register'); }
+
+function hideAuth() {
+    document.getElementById('authScreen').classList.remove('show');
+}
+
+async function submitAuth() {
+    const username = document.getElementById('auth_user').value.trim();
+    const password = document.getElementById('auth_pass').value;
+    const confirmPass = document.getElementById('auth_pass2').value;
+    const claim = document.getElementById('authClaimBox').checked;
+    const registering = authMode === 'register';
+
+    if (!username) return authError('请输入用户名');
+    if (!password) return authError('请输入密码');
+    if (registering && password !== confirmPass) return authError('两次输入的密码不一致');
+
+    const body = { username, password };
+    if (registering) { body.confirm = confirmPass; body.claim_legacy = claim; }
+
+    const btn = document.getElementById('authSubmit');
+    btn.disabled = true;
+    try {
+        const res = await fetch(registering ? '/api/auth/register' : '/api/auth/login', {
+            method: 'POST', headers: apiHeaders(), body: JSON.stringify(body)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.token) {
+            authError(data.error || '操作失败，请重试');
+            return;
+        }
+        setToken(data.token);
+        document.getElementById('auth_pass').value = '';
+        document.getElementById('auth_pass2').value = '';
+        authStatus = null;
+        hideAuth();
+        await sync();
+        if (registering) {
+            showToast(data.claimed ? `账号创建成功，已继承 ${data.claimed} 条任务` : '账号创建成功');
+        } else {
+            showToast('登录成功');
+        }
+    } catch(e) {
+        console.error('账号操作失败', e);
+        authError('网络异常，请稍后重试');
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function logout() {
+    if (!confirm('确认退出当前账号？')) return;
+    try {
+        await fetch('/api/auth/logout', { method: 'POST', headers: apiHeaders() });
+    } catch(e) {
+        console.error('退出登录失败', e);
+    }
+    setToken('');
+    S = null;
+    hideAuth();
+    await openAuth('login');
+}
+
+async function claimLegacyData() {
+    const legacy = (S && S.account && S.account.legacy) || {};
+    const total = (legacy.reminders || 0) + (legacy.logs || 0);
+    if (!total) { showToast('没有可导入的遗留数据', 'info-circle', 'var(--c-text3)'); return; }
+    if (!confirm(`确认把 ${legacy.reminders || 0} 条遗留提醒与 ${legacy.logs || 0} 条历史记录导入当前账号？`)) return;
+
+    try {
+        const res = await fetch('/api/auth/claim-legacy', { method: 'POST', headers: apiHeaders() });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            showToast(data.error || '导入失败', 'times-circle', 'var(--c-red)');
+            return;
+        }
+        await sync();
+        showToast(`已导入 ${data.reminders} 条提醒, ${data.logs} 条记录`);
+    } catch(e) {
+        console.error('导入遗留数据失败', e);
+        showToast('导入失败', 'times-circle', 'var(--c-red)');
+    }
+}
+
+async function changePassword() {
+    const oldPass = document.getElementById('pw_old').value;
+    const newPass = document.getElementById('pw_new').value;
+    const confirmPass = document.getElementById('pw_confirm').value;
+    const box = document.getElementById('pwError');
+    const fail = (msg) => { box.textContent = msg; box.classList.add('show'); };
+    box.classList.remove('show');
+
+    if (!oldPass) return fail('请输入原密码');
+    if (!newPass || newPass.length < 6) return fail('新密码至少 6 位');
+    if (newPass !== confirmPass) return fail('两次输入的新密码不一致');
+
+    try {
+        const res = await fetch('/api/auth/password', {
+            method: 'POST', headers: apiHeaders(),
+            body: JSON.stringify({ old_password: oldPass, new_password: newPass, confirm: confirmPass })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return fail(data.error || '修改失败');
+        if (data.token) setToken(data.token);
+        document.getElementById('pw_old').value = '';
+        document.getElementById('pw_new').value = '';
+        document.getElementById('pw_confirm').value = '';
+        closeSheet();
+        showToast('密码已更新，其他设备需重新登录');
+        sync();
+    } catch(e) {
+        console.error('修改密码失败', e);
+        fail('网络异常，请稍后重试');
+    }
 }
 
 // ─── Clock ───
@@ -946,7 +1413,20 @@ setInterval(tickClock, 1000); tickClock();
 async function sync() {
     try {
         const res = await fetch('/api/state', { headers: apiHeaders() });
-        S = await res.json();
+        if (res.status === 401) {
+            // 会话失效：清除本地 token 并回到登录界面
+            setToken('');
+            S = null;
+            await openAuth('login');
+            return;
+        }
+        const payload = await res.json();
+        if (!res.ok) {
+            console.error('sync failed', payload);
+            return;
+        }
+        S = payload;
+        hideAuth();
         if (S.version) document.getElementById('appVersion').textContent = S.version;
         
         // Check persistence health
@@ -987,6 +1467,13 @@ function paintHome() {
     // Counters
     document.getElementById('pendingCount').textContent = pending.length;
     document.getElementById('totalCount').textContent = `共 ${total} 项`;
+
+    // 多账号：开放模式提示（已登录或已有账号时隐藏）
+    const account = S.account || {};
+    const prompt = document.getElementById('accountPrompt');
+    if (prompt) {
+        prompt.style.display = (account.login_required === false && !account.user) ? 'flex' : 'none';
+    }
 
     // Task List
     const container = document.getElementById('taskContainer');
@@ -1196,62 +1683,74 @@ function editTask(id) {
 
 // ─── Data View ───
 function paintData() {
-    // Chart
-    const ctx = document.getElementById('weekChart').getContext('2d');
-    if (weekChart) weekChart.destroy();
+    const allLogs = S.logs || [];
 
-    const counts = [0,0,0,0,0,0,0];
-    S.logs.forEach(l => {
-        if (l.triggered_at) {
-            const d = new Date(l.triggered_at).getDay();
-            counts[d === 0 ? 6 : d - 1]++;
-        }
-    });
-
-    weekChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: ['周一','周二','周三','周四','周五','周六','周日'],
-            datasets: [{
-                data: counts,
-                backgroundColor: 'rgba(10,132,255,0.6)',
-                borderRadius: 6,
-                borderSkipped: false,
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { grid: { display: false }, ticks: { color: '#636366', font: { size: 11 } } },
-                y: { display: false }
-            }
-        }
-    });
+    // 历史统计（仅基于通知记录本身计算）
+    const todayKey = dayKey(new Date());
+    document.getElementById('histToday').textContent =
+        allLogs.filter(l => dayKey(parseLogDate(l)) === todayKey).length;
+    document.getElementById('histTotal').textContent = allLogs.length;
+    document.getElementById('histDone').textContent = allLogs.filter(l => l.completed_at).length;
 
     // Log List with action buttons (需求1)
     const logC = document.getElementById('logContainer');
-    const logs = S.logs.slice().reverse();
+    const logs = allLogs.slice().sort((a, b) => parseLogDate(b) - parseLogDate(a));
     if (logs.length === 0) {
-        logC.innerHTML = '<div class="empty-state"><i class="far fa-bell-slash"></i><p>暂无通知记录</p></div>';
+        logC.innerHTML = '<div class="empty-state"><i class="far fa-bell-slash"></i><p>暂无通知记录<br>提醒触发后会在这里留下历史</p></div>';
         return;
     }
-    logC.innerHTML = logs.map(l => `
+
+    // 按日期分组渲染历史记录
+    let html = '';
+    let lastKey = null;
+    logs.forEach(l => {
+        const d = parseLogDate(l);
+        const key = dayKey(d);
+        if (key !== lastKey) {
+            lastKey = key;
+            const groupCount = logs.filter(x => dayKey(parseLogDate(x)) === key).length;
+            html += `<div class="log-group-head"><span class="bar"></span>${dayLabel(d)}<span class="cnt">${groupCount}</span></div>`;
+        }
+        html += `
         <div class="log-entry ${l.hidden ? 'hidden-log' : ''}" id="log-${l.id}">
             <div class="log-icon ${l.completed_at ? 'completed' : 'triggered'}">
                 <i class="fas fa-${l.completed_at ? 'check' : 'bell'}"></i>
             </div>
             <div class="log-body">
                 <h4>${l.title}</h4>
-                <p>${new Date(l.triggered_at).toLocaleString('zh-CN')} · ${l.completed_at ? '已处理' : '已通知'}</p>
+                <p>${timeLabel(d)} · <span class="log-status ${l.completed_at ? 'done' : 'pending'}">${l.completed_at ? '已处理' : '已通知'}</span></p>
             </div>
             <div class="log-actions">
                 <button class="act-btn" title="隐藏" onclick="hideLog('${l.id}')"><i class="fas fa-eye-slash"></i></button>
                 <button class="act-btn" title="复用" onclick="reuseLog('${l.title}')"><i class="fas fa-copy"></i></button>
                 <button class="act-btn delete" title="删除" onclick="deleteLog('${l.id}')"><i class="fas fa-trash-can"></i></button>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    });
+    logC.innerHTML = html;
+}
+
+// ─── History Helpers ───
+function parseLogDate(l) {
+    const d = new Date(l && l.triggered_at ? l.triggered_at : Date.now());
+    return isNaN(d.getTime()) ? new Date() : d;
+}
+function dayKey(d) {
+    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+function dayLabel(d) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const target = new Date(d); target.setHours(0, 0, 0, 0);
+    const diff = Math.round((today - target) / 86400000);
+    if (diff === 0) return '今天';
+    if (diff === 1) return '昨天';
+    if (diff === 2) return '前天';
+    const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()];
+    const md = `${d.getMonth() + 1}月${d.getDate()}日`;
+    return d.getFullYear() === today.getFullYear() ? `${md} ${week}` : `${d.getFullYear()}年${md}`;
+}
+function timeLabel(d) {
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 // ─── Log Actions ───
@@ -1284,9 +1783,11 @@ function toggleHiddenLogs() {
     const btn = document.getElementById('toggleHiddenBtn');
     if (showHidden) {
         container.classList.add('show-hidden');
+        btn.classList.add('on');
         btn.textContent = '隐藏';
     } else {
         container.classList.remove('show-hidden');
+        btn.classList.remove('on');
         btn.textContent = '显示已隐藏';
     }
 }
@@ -1315,6 +1816,32 @@ function paintSettings() {
     document.body.setAttribute('data-theme', dark ? '' : 'light');
     document.getElementById('darkToggle').className = 'toggle' + (dark ? ' on' : '');
     document.getElementById('darkDesc').textContent = dark ? '当前已开启' : '当前已关闭';
+
+    // 多账号：当前登录账号卡片
+    const account = S.account || {};
+    const acctCard = document.getElementById('acctCard');
+    if (account.user) {
+        acctCard.style.display = 'flex';
+        document.getElementById('acctAvatar').textContent = account.user.slice(0, 1).toUpperCase();
+        document.getElementById('acctName').textContent = account.user;
+        const profile = account.profile || {};
+        document.getElementById('acctMeta').textContent =
+            `${profile.reminders || 0} 项任务 · ${profile.pending || 0} 项待办`;
+    } else {
+        acctCard.style.display = 'none';
+    }
+
+    // 未归属的遗留数据：允许登录后导入当前账号
+    const legacy = account.legacy || {};
+    const legacyTotal = (legacy.reminders || 0) + (legacy.logs || 0);
+    const legacyGroup = document.getElementById('legacyGroup');
+    if (account.user && legacyTotal > 0) {
+        legacyGroup.style.display = 'block';
+        document.getElementById('legacyDesc').textContent =
+            `${legacy.reminders || 0} 条提醒 · ${legacy.logs || 0} 条历史记录`;
+    } else {
+        legacyGroup.style.display = 'none';
+    }
 
     const wh = S.db.settings.webhooks || {};
     document.getElementById('w_wecom').value = wh.wecom || '';
@@ -1688,6 +2215,13 @@ function openSheet(id) {
         document.querySelectorAll('#weekdayPicker .chip').forEach(c => c.classList.remove('active'));
         document.getElementById('timePickerBox').style.display = 'none';
     }
+    // 修改密码面板：打开时清空上次输入与错误提示
+    if (id === 'password') {
+        document.getElementById('pwError').classList.remove('show');
+        document.getElementById('pw_old').value = '';
+        document.getElementById('pw_new').value = '';
+        document.getElementById('pw_confirm').value = '';
+    }
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('sheet-' + id).style.display = 'block';
 }
@@ -1695,6 +2229,7 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
+        { version: 'v3.2.19', changes: ['多账号：自助注册 / 登录 / 登出 / 改密，账号数据完全隔离', '账号安全：PBKDF2 密码哈希、会话 token 摘要存储、登录失败锁定', 'UI 改版：全新设计令牌、卡片与 Dock 视觉升级、浅色模式优化', '数据页去除柱状图，改为按日期分组的历史记录 + 统计条', '开放模式遗留数据可在设置页一键导入账号'] },
         { version: 'v3.2.18', changes: ['节假日库启动年检 + 容器自动升级', 'chinese_calendar 升级至 >=1.11.0，支持 2026 年'] },
         { version: 'v3.2.17', changes: ['升级 chinese_calendar 至 >=1.11.0，支持 2026 年中国法定节假日'] },
         { version: 'v3.2.16', changes: ['一键清空已完成任务（含关联日志清理）', '修复切换完成状态验证失败', '按钮移至数据页通知记录右侧'] },
@@ -1749,8 +2284,15 @@ function closeSheet() {
 }
 
 // ─── Bootstrap ───
-sync();
-setInterval(sync, 12000);
+(async function bootstrap() {
+    authStatus = await fetchAuthStatus();
+    if (authStatus && authStatus.login_required && !getToken()) {
+        await openAuth(authStatus.accounts === 0 ? 'register' : 'login', authStatus);
+        return;
+    }
+    await sync();
+})();
+setInterval(() => { if (S) sync(); }, 12000);
 </script>
 
 </body>

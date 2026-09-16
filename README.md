@@ -52,6 +52,7 @@ docker compose up -d
 | `APP_PORT` | `5000` | 服务端口 |
 | `DATA_DIR` | `/app/data` | 数据持久化目录 |
 | `API_KEY` | (空，不启用) | API 认证密钥 |
+| `ALLOW_REGISTRATION` | `true` | 是否允许自助注册新账号 |
 | `WX_APPID` | (空) | 微信小程序 AppID |
 | `WX_SECRET` | (空) | 微信小程序 Secret |
 | `ZSPACE_COMPAT` | `false` | 极空间 NAS 兼容模式 |
@@ -64,6 +65,24 @@ environment:
 ```
 
 设置后，所有 `/api/*` 请求需携带 `X-API-Key` 头。前端通过 `?api_key=xxx` URL 参数访问。
+
+### 多账号（注册 / 登录 / 数据隔离）
+
+首次打开页面时若系统尚未注册任何账号，仍以原有「开放模式」运行，页面顶部会出现注册入口。
+
+1. 点击「去注册」，填写用户名与密码（用户名 2-32 位中文/字母/数字/_/-，密码至少 6 位）
+2. 首个账号可勾选「继承当前（未登录模式）下的提醒与历史记录」，把开放模式数据迁移到该账号
+3. 注册成功后自动登录，此后所有页面必须登录访问，各账号的提醒、设置、通知历史相互隔离
+4. 忘记密码需由管理员清理 `config.json` 中对应账号记录（无邮件找回功能）
+
+关闭自助注册（已有账号仍可正常登录）：
+
+```yaml
+environment:
+  - ALLOW_REGISTRATION=false
+```
+
+账号数据保存在 `data/config.json` 的 `users` 字段中，密码使用 PBKDF2-HMAC-SHA256（20 万次迭代 + 随机盐）哈希存储，会话 token 仅保存 SHA-256 摘要，有效期 30 天。
 
 ### 极空间 (ZSpace) 部署
 

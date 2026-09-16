@@ -15,6 +15,7 @@ reminder_history.json
 .vscode/
 .idea/
 .trae/
+.reasonix/
 .DS_Store
 
 # Local protocol (not for git)

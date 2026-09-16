@@ -3,7 +3,7 @@ import re
 import logging
 import zoneinfo
 
-VERSION = "3.2.18"
+VERSION = "3.2.19"
 
 DATETIME_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$')
 TIME_PATTERN = re.compile(r'^\d{1,2}:\d{2}$')
@@ -63,6 +63,9 @@ DATA_DIR = os.getenv("DATA_DIR", "/app/data")
 APP_PORT = int(os.getenv("APP_PORT", 5000))
 TZ = os.getenv("TZ", "Asia/Shanghai")
 API_KEY = os.getenv("API_KEY", "").strip()
+
+# 多账号：是否允许自助注册（false/0/no 关闭；关闭不影响已有账号登录）
+ALLOW_REGISTRATION = os.getenv("ALLOW_REGISTRATION", "true").strip().lower() not in ("false", "0", "no")
 
 try:
     TZ_ENV = zoneinfo.ZoneInfo(TZ)

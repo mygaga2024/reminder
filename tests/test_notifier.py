@@ -131,3 +131,73 @@ class TestGenericWebhook:
         import requests as req
         mock_post.side_effect = req.ConnectionError("Connection refused")
         _send_generic_webhook("sms_api", "https://invalid.example.com", "title", "msg")
+
+
+class TestMultiAccountNotify:
+    """多账号：Webhook 与日志按提醒归属账号隔离"""
+
+    def make_db(self):
+        return {
+            "reminders": [],
+            "settings": {"webhooks": {"wecom": "https://legacy.example.com", "dingtalk": "", "lark": ""}},
+            "users": {
+                "alice": {
+                    "username": "alice",
+                    "reminders": [],
+                    "settings": {"webhooks": {"wecom": "https://alice.example.com", "dingtalk": "", "lark": ""}}
+                }
+            }
+        }
+
+    def make_reminder(self, **overrides):
+        defaults = {
+            "id": "reminder-alice-1",
+            "title": "alice 的提醒",
+            "time": "10:00",
+            "repeat": "daily",
+            "status": "pending",
+            "user": "alice"
+        }
+        defaults.update(overrides)
+        return defaults
+
+    @patch('app.notifier.requests.post')
+    def test_uses_owner_webhooks(self, mock_post):
+        mock_post.return_value.status_code = 200
+        db = self.make_db()
+
+        notify_engine(self.make_reminder(), db, [], MagicMock())
+
+        assert mock_post.called
+        assert mock_post.call_args[0][0] == "https://alice.example.com"
+
+    @patch('app.notifier.requests.post')
+    def test_falls_back_to_top_level_webhooks(self, mock_post):
+        mock_post.return_value.status_code = 200
+        db = self.make_db()
+
+        notify_engine(self.make_reminder(user=None), db, [], MagicMock())
+
+        assert mock_post.called
+        assert mock_post.call_args[0][0] == "https://legacy.example.com"
+
+    def test_log_entry_records_owner(self):
+        db = self.make_db()
+        logs = []
+
+        notify_engine(self.make_reminder(), db, logs, MagicMock())
+
+        assert logs[0]["user"] == "alice"
+
+    def test_once_reminder_removed_from_owner_scope(self):
+        db = self.make_db()
+        reminder = self.make_reminder(repeat="once")
+        db["users"]["alice"]["reminders"] = [reminder]
+        db["reminders"] = [reminder]
+        scheduler = MagicMock()
+
+        notify_engine(reminder, db, [], scheduler)
+
+        assert db["users"]["alice"]["reminders"] == []
+        assert db["reminders"] == []
+        scheduler.remove_job.assert_called_once_with("reminder-alice-1")

@@ -1,10 +1,13 @@
 import re
 from functools import wraps
-from flask import request, jsonify
+from flask import request, jsonify, g, current_app
 
 from app.config import API_KEY, VALID_REPEAT_MODES, VALID_PRIORITIES
 from app.config import TITLE_MAX_LENGTH, TIME_MAX_LENGTH, WEBHOOK_URL_MAX_LENGTH
 from app.config import DATETIME_PATTERN, TIME_PATTERN
+from app import users
+
+SESSION_HEADER = "X-Auth-Token"
 
 
 def require_api_key(f):
@@ -16,6 +19,31 @@ def require_api_key(f):
         key = request.headers.get("X-API-Key", "") or request.args.get("api_key", "")
         if key != API_KEY:
             return jsonify({"error": "Unauthorized: Invalid or missing API key"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+
+def current_token() -> str:
+    """读取请求携带的会话 token"""
+    return (request.headers.get(SESSION_HEADER) or "").strip()
+
+
+def require_login(f):
+    """多账号会话中间件
+
+    - 尚未注册任何账号时保持开放模式：g.username = None，数据落在顶层 db
+    - 已注册账号后必须携带有效 X-Auth-Token，否则返回 401 (code=unauthenticated)
+    - 校验通过后注入 g.username / g.auth_token，供 api.py 做账号数据隔离
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        db = current_app.config.get('GLOBAL_DB') or {}
+        token = current_token()
+        username = users.resolve_session(db, token) if token else None
+        if not username and users.has_accounts(db):
+            return jsonify({"error": "未登录或会话已过期", "code": "unauthenticated"}), 401
+        g.username = username
+        g.auth_token = token if username else ""
         return f(*args, **kwargs)
     return decorated
 

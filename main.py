@@ -6,13 +6,14 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.config import (
     VERSION, APP_PORT, TZ, TZ_ENV, logger, log_handler,
-    CONFIG_FILE, LOGS_FILE, PERSISTENCE_HEALTH, API_KEY
+    CONFIG_FILE, LOGS_FILE, PERSISTENCE_HEALTH, API_KEY, ALLOW_REGISTRATION
 )
 from app.persistence import run_health_check, load_json, save_json, init_db
 from app.scheduler import update_scheduler
 from app.notifier import notify_engine
 from app.calendar_utils import check_calendar_coverage
 from app.api import register_routes
+from app import users
 
 run_health_check()
 
@@ -23,10 +24,13 @@ db = load_json(CONFIG_FILE, {
         "dark_mode": True,
         "webhooks": {"wecom": "", "dingtalk": "", "lark": ""}
     },
-    "users": {}
+    "users": {},
+    "sessions": {}
 })
 logs = load_json(LOGS_FILE, [])
 db, logs = init_db(db, logs)
+# 多账号结构迁移：补齐账号字段、清理过期会话、重建调度器合并视图
+account_info = users.migrate_db(db)
 
 logger.info("=== 系统启动摘要 ===")
 logger.info(f"时区: {TZ}")
@@ -34,6 +38,18 @@ logger.info(f"配置文件路径: {CONFIG_FILE}")
 logger.info(f"配置文件存在: {True}")
 logger.info(f"加载提醒数量: {len(db.get('reminders', []))}")
 logger.info(f"加载日志数量: {len(logs)}")
+if account_info["accounts"]:
+    logger.info(
+        f"多账号模式: 已启用 ({account_info['accounts']} 个账号, "
+        f"{account_info['sessions']} 个活跃会话, 数据按账号隔离)"
+    )
+else:
+    logger.warning("多账号模式: 未注册账号（开放模式，注册后自动启用数据隔离）")
+if account_info["legacy_reminders"]:
+    logger.info(f"开放模式提醒: {account_info['legacy_reminders']} 条（可被首个账号继承）")
+if account_info["purged_sessions"]:
+    logger.info(f"已清理过期会话: {account_info['purged_sessions']} 个")
+logger.info(f"自助注册: {'已开放' if ALLOW_REGISTRATION else '已关闭（ALLOW_REGISTRATION=false）'}")
 if API_KEY:
     logger.info("API Key 认证: 已启用")
 else:

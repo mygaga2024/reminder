@@ -6,6 +6,7 @@ from app.config import logger, TIPS_LIST
 from app.config import LOGS_FILE, CONFIG_FILE
 from app.calendar_utils import is_china_workday
 from app.persistence import save_json, db_lock
+from app import users
 
 
 def notify_engine(reminder: dict, db: dict, logs: list, scheduler=None) -> None:
@@ -20,7 +21,8 @@ def notify_engine(reminder: dict, db: dict, logs: list, scheduler=None) -> None:
                     logger.info(f"工作日任务跳过（非法定工作日）: {reminder.get('title')} - {today}")
                     return
 
-            s = db["settings"]
+            # 多账号：Webhook 配置取自提醒归属账号，开放模式回落顶层设置
+            s = users.owned_settings(db, reminder)
             title = reminder.get("title", "未命名提醒")
             now = datetime.datetime.now()
             date_str = now.strftime('%Y年%m月%d日')
@@ -43,6 +45,7 @@ def notify_engine(reminder: dict, db: dict, logs: list, scheduler=None) -> None:
             log_entry = {
                 "id": str(uuid.uuid4()),
                 "reminder_id": reminder.get("id", "unknown"),
+                "user": reminder.get("user"),
                 "title": title,
                 "triggered_at": datetime.datetime.now().isoformat(),
                 "completed_at": None,
@@ -64,7 +67,7 @@ def notify_engine(reminder: dict, db: dict, logs: list, scheduler=None) -> None:
                         logger.info(f"调度任务已移除: {rid}")
                     except Exception as e:
                         logger.warning(f"移除调度任务失败: {e}")
-                db["reminders"] = [r for r in db["reminders"] if r.get("id") != rid]
+                users.remove_reminder(db, rid)
                 save_json(CONFIG_FILE, db)
                 logger.info(f"一次性任务已自动删除: {title}")
         except Exception as e:
