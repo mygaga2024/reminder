@@ -189,16 +189,16 @@
                 <div class="set-item" onclick="exportBackup()">
                     <div class="set-left">
                         <div class="set-icon" style="background:rgba(48,209,88,0.12); color:var(--c-green)"><i class="fas fa-file-export"></i></div>
-                        <div class="set-label"><h4>导出备份</h4><p>下载当前账号的提醒、历史与设置</p></div>
+                        <div class="set-label"><h4>导出备份</h4><p>下载到本地：当前账号的提醒、历史与设置</p></div>
                     </div>
-                    <div class="set-right"><i class="fas fa-download"></i></div>
+                    <div class="set-right"><i class="fas fa-chevron-right"></i></div>
                 </div>
                 <div class="set-item" onclick="document.getElementById('importFile').click()">
                     <div class="set-left">
                         <div class="set-icon" style="background:rgba(10,132,255,0.12); color:var(--c-blue)"><i class="fas fa-file-import"></i></div>
                         <div class="set-label"><h4>导入备份</h4><p>按标题+时间+重复去重后新增，不覆盖现有数据</p></div>
                     </div>
-                    <div class="set-right"><i class="fas fa-upload"></i></div>
+                    <div class="set-right"><i class="fas fa-chevron-right"></i></div>
                 </div>
                 <input type="file" id="importFile" accept="application/json,.json" style="display:none" onchange="importBackup(this)">
             </div>
@@ -244,7 +244,7 @@
 
             <div class="footer-info">
                 <span id="authStatus"></span>
-                Life Reminder v<span id="appVersion">3.2.31</span><br>
+                Life Reminder v<span id="appVersion">3.2.32</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
