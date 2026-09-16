@@ -54,8 +54,6 @@ docker compose up -d
 | `API_KEY` | (空，不启用) | API 认证密钥 |
 | `ALLOW_REGISTRATION` | `true` | 是否允许自助注册新账号 |
 | `LOG_RETENTION_DAYS` | `30` | 通知记录保留天数（下次推送时清理更早记录） |
-| `WX_APPID` | (空) | 微信小程序 AppID |
-| `WX_SECRET` | (空) | 微信小程序 Secret |
 | `ZSPACE_COMPAT` | `false` | 极空间 NAS 兼容模式 |
 
 ### API Key 认证
@@ -121,15 +119,22 @@ environment:
 
 ### 极空间 (ZSpace) 部署
 
-极空间 NAS 使用内核级 ACL 限制 Docker 卷写入。启用 `ZSPACE_COMPAT` 后，系统会自动执行以下策略：
+极空间 NAS 使用内核级 ACL 限制 Docker 卷写入。**以下策略始终启用**，无需任何开关（`ZSPACE_COMPAT` 只是为兼容旧 compose 保留的占位项，代码并未读取它，加不加都一样）：
 
 1. **umask 000** — 所有新文件获得 777 权限
 2. **子目录回退** — 根挂载点不可写时，自动使用卷内 `store/` 子目录
 3. **三重写入降级** — tempfile → 同名.tmp → 直接覆盖，确保数据落盘
 4. **自动数据迁移** — 切换存储路径时自动迁移已有数据
+5. **入口权限容错** — `entrypoint.sh` 的 `chown` 允许静默失败（ACL 锁场景不中断启动）
+
+排障工具（容器内执行）：
+
+```bash
+docker exec -it life-reminder bash /app/scripts/diagnose_zspace.sh
+```
 
 ```yaml
-# docker-compose.yaml — 极空间专用
+# docker-compose.yaml — 极空间示例（ZSPACE_COMPAT 可省略）
 services:
   reminder:
     image: ghcr.io/mygaga2024/reminder:latest
@@ -146,7 +151,6 @@ services:
       - PUID=0
       - PGID=0
       - UMASK=000
-      - ZSPACE_COMPAT=true
 ```
 
 > 极空间用户请注意：在文件管理器中，右键映射目录 →「属性」→「权限设置」→ 勾选「合规目录最大读写权限」。
@@ -191,7 +195,35 @@ reminder/
 | `POST` | `/api/settings` | 更新设置 |
 | `DELETE` | `/api/logs/<id>` | 删除日志 |
 | `POST` | `/api/logs/hide/<id>` | 隐藏日志 |
-| `POST` | `/api/wxlogin` | 微信登录 |
+
+## 升级说明（v3.2.19 → v3.2.30，影响所有既有安装）
+
+> 升级前建议先备份 `data/` 目录（或使用「设置 → 导出备份」）。
+
+**多账号（v3.2.19+）**
+
+- 没有任何账号时行为不变（开放模式，原有任务可直接使用，首个账号可一键继承）
+- 一旦注册了任一账号，**所有 `/api/*` 都需要登录态**（`X-Auth-Token`）。只用 `API_KEY` 调接口的脚本会收到 401，需先注册账号并带上会话 token
+- `/api/state` 不再返回原始数据库：`db.users` 恒为 `{}`，新增 `account` 与 `log_stats` 字段
+
+**数据写入（v3.2.25 / v3.2.27）**
+
+- 「删除最后一条提醒 / 最后一条通知记录」现在会正常落盘（此前被空数据保护拦截，重启后数据会“复活”）
+- 空数据保护改为只拦截结构损坏的写入（`None` / 空 dict）；清空全部提醒时会写一条 WARNING 日志便于排查
+
+**接口变更**
+
+| 变更 | 说明 |
+|---|---|
+| `PUT/DELETE /api/reminders/<id>` | id 不存在时返回 404（此前返回 200） |
+| `time` 字段 | 必须是 `HH:MM` 或 `YYYY-MM-DD HH:MM`，非法值返回 400 |
+| `/api/wxlogin` | 已移除（微信小程序登录从未真正可用），调用会得到 404 |
+| 新增端点 | `/api/auth/*`（注册/登录/登出/改密/昵称/注销/退出其他设备）、`/api/reminders/snooze`、`/api/logs/complete/<id>`、`/api/settings/test-webhook`、`/api/export`、`/api/import`、`/app.css`、`/app.js` |
+
+**前端**
+
+- 数据页移除 Chart.js 柱状图，改为按日期分组的历史记录 + 统计条
+- 前端拆分为 `index.html` + `app.css` + `app.js`（由服务端提供，无需重新构建）
 
 ## 故障诊断
 

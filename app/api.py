@@ -1,14 +1,13 @@
 import datetime
 import uuid
 import os
-import json
 from flask import request, jsonify, g
 from app.config import logger, VERSION, PERSISTENCE_HEALTH, API_KEY
 from app.config import CONFIG_FILE, LOGS_FILE, TZ_ENV, ALLOW_REGISTRATION, VALID_PRIORITIES
 from app.persistence import save_json, db_lock
 from app.auth import (
     require_api_key, require_login, current_token,
-    validate_reminder_input, validate_webhook_url, sanitize_log_message
+    validate_reminder_input, validate_webhook_url
 )
 from app.scheduler import update_scheduler
 from app.notifier import send_test_notification
@@ -813,48 +812,6 @@ def register_routes(app, db: dict, logs: list, scheduler):
             except Exception as e:
                 logger.error(f"导入数据失败: {e}")
                 return jsonify({"error": "导入数据失败"}), 500
-
-    @app.route('/api/wxlogin', methods=['POST'])
-    @require_api_key
-    def wx_login():
-        with db_lock:
-            try:
-                code = request.json.get('code')
-                if not code:
-                    return jsonify({"error": "code 不能为空"}), 400
-
-                appid = os.getenv("WX_APPID", "")
-                secret = os.getenv("WX_SECRET", "")
-
-                if not appid or not secret:
-                    return jsonify({"error": "未配置微信AppID和Secret，请检查环境变量"}), 400
-
-                import urllib.request
-                url = f"https://api.weixin.qq.com/sns/jscode2session?appid={appid}&secret={'***'}&js_code={code}&grant_type=authorization_code"
-                actual_url = url.replace("secret=***", f"secret={secret}")
-                logger.info(f"微信登录请求: {sanitize_log_message(url)}")
-
-                with urllib.request.urlopen(actual_url, timeout=10) as resp:
-                    data = json.loads(resp.read().decode())
-
-                if "openid" in data:
-                    wxid = data["openid"]
-                    if "users" not in db:
-                        db["users"] = {}
-                    if wxid not in db["users"]:
-                        db["users"][wxid] = {
-                            "openid": wxid,
-                            "created_at": datetime.datetime.now(TZ_ENV).isoformat()
-                        }
-                    save_json(CONFIG_FILE, db)
-                    logger.info(f"微信用户登录: {wxid}")
-                    return jsonify({"openid": wxid, "status": "ok"})
-                else:
-                    logger.error(f"微信接口返回错误: {data.get('errmsg', 'unknown')}")
-                    return jsonify({"error": "微信接口错误"}), 400
-            except Exception as e:
-                logger.error(f"微信登录失败: {sanitize_log_message(str(e))}")
-                return jsonify({"error": "微信登录失败"}), 500
 
     return app
 

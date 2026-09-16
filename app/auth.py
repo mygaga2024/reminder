@@ -148,7 +148,3 @@ def validate_webhook_url(url: str) -> bool:
         return False
     return bool(re.match(r'^https?://', url))
 
-
-def sanitize_log_message(msg: str) -> str:
-    """脱敏日志消息中的敏感信息 (如 wx secret)"""
-    return re.sub(r'secret=([^&\s]+)', r'secret=***', msg)

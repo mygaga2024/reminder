@@ -295,16 +295,6 @@ class TestAuth:
         assert auth_key == 'test-key-123'
 
 
-class TestWxLogin:
-    def test_missing_code_fails(self, client):
-        resp = client.post('/api/wxlogin', json={})
-        assert resp.status_code == 400
-
-    def test_missing_env_config_fails(self, client):
-        resp = client.post('/api/wxlogin', json={"code": "test-code"})
-        assert resp.status_code == 400
-
-
 @pytest.fixture(autouse=True)
 def clear_login_locks():
     """避免登录失败计数在用例之间串扰"""
