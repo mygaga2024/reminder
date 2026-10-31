@@ -156,6 +156,11 @@ def _send_webhooks(webhooks: dict, msg: str, reminder: dict) -> None:
             _send_generic_webhook(platform, url, title, msg)
 
 
+def wecom_gateway_enabled() -> bool:
+    """企业微信统一出口是否已完整配置"""
+    return bool(WECOM_GATEWAY_ENABLED)
+
+
 def _send_wecom_gateway(title: str, msg: str) -> bool:
     """经 NAS notify 容器发送到企业微信自建应用"""
     if not WECOM_GATEWAY_ENABLED:
@@ -220,6 +225,14 @@ def test_message(platform: str) -> str:
 
 def send_test_notification(platform: str, url: str) -> tuple:
     """发送测试消息，返回 (是否成功, 提示信息)"""
+    # 企业微信启用统一出口后，测试消息也必须走 notify 应用，
+    # 避免继续使用账号里遗留的群机器人 Webhook。
+    if platform == "wecom" and wecom_gateway_enabled():
+        msg = test_message(platform)
+        if _send_wecom_gateway("Life Reminder 测试推送", msg):
+            return True, "测试消息已通过企业微信统一网关发送，请到对应群聊确认"
+        return False, "企业微信统一网关推送失败，请查看容器日志"
+
     if not url:
         return False, "该渠道还没有配置 Webhook 地址"
     if platform not in SUPPORTED_PLATFORMS and platform not in GENERIC_PLATFORMS:

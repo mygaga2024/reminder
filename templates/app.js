@@ -252,7 +252,7 @@ async function saveNickname() {
 // ─── Webhook 测试推送 ───
 async function testWebhook(channel, inputId, btn) {
     const url = (document.getElementById(inputId).value || '').trim();
-    if (!url) {
+    if (!url && channel !== 'wecom') {
         showToast('请先填写该渠道的 Webhook 地址', 'triangle-exclamation', '#ff9f0a');
         return;
     }
