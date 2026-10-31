@@ -6,6 +6,8 @@ services:
     restart: unless-stopped
     ports:
       - "35015:5000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/app/data
     environment:
@@ -15,6 +17,10 @@ services:
       - UMASK=000
       - APP_PORT=5000
       - DATA_DIR=/app/data
+      # 企业微信自建应用统一出口（值放在 NAS 的 .env，不提交到 Git）
+      - WECOM_GATEWAY_URL=${WECOM_GATEWAY_URL:-}
+      - WECOM_GATEWAY_APP_ID=${WECOM_GATEWAY_APP_ID:-}
+      - WECOM_GATEWAY_TOKEN=${WECOM_GATEWAY_TOKEN:-}
       # 极空间(ZSpace)兼容策略始终启用，无需额外开关（ZSPACE_COMPAT 为历史占位项）
       # API Key 认证（可选）
       # - API_KEY=your-secret-key-here

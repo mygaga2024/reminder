@@ -67,6 +67,16 @@ APP_PORT = int(os.getenv("APP_PORT", 5000))
 TZ = os.getenv("TZ", "Asia/Shanghai")
 API_KEY = os.getenv("API_KEY", "").strip()
 
+# 企业微信自建应用统一出口（NAS notify 容器）
+WECOM_GATEWAY_URL = os.getenv("WECOM_GATEWAY_URL", "").strip().rstrip("/")
+WECOM_GATEWAY_APP_ID = os.getenv("WECOM_GATEWAY_APP_ID", "").strip()
+WECOM_GATEWAY_TOKEN = os.getenv("WECOM_GATEWAY_TOKEN", "").strip()
+WECOM_GATEWAY_ENABLED = bool(
+    WECOM_GATEWAY_URL and WECOM_GATEWAY_APP_ID and WECOM_GATEWAY_TOKEN
+)
+if any((WECOM_GATEWAY_URL, WECOM_GATEWAY_APP_ID, WECOM_GATEWAY_TOKEN)) and not WECOM_GATEWAY_ENABLED:
+    logger.warning("企业微信应用网关配置不完整，已回退到原有 Webhook 通知")
+
 # 多账号：是否允许自助注册（false/0/no 关闭；关闭不影响已有账号登录）
 ALLOW_REGISTRATION = os.getenv("ALLOW_REGISTRATION", "true").strip().lower() not in ("false", "0", "no")
 

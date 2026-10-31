@@ -5,6 +5,12 @@ import requests
 from functools import partial
 from app.config import logger, TIPS_LIST, TZ_ENV, LOG_RETENTION_DAYS
 from app.config import LOGS_FILE, CONFIG_FILE
+from app.config import (
+    WECOM_GATEWAY_URL,
+    WECOM_GATEWAY_APP_ID,
+    WECOM_GATEWAY_TOKEN,
+    WECOM_GATEWAY_ENABLED,
+)
 from app.calendar_utils import is_china_workday
 from app.persistence import save_json, db_lock
 from app import users
@@ -133,14 +139,63 @@ def _send_webhooks(webhooks: dict, msg: str, reminder: dict) -> None:
     """发送所有配置的 webhook 通知"""
     title = reminder.get("title", "")
 
+    if WECOM_GATEWAY_ENABLED:
+        _send_wecom_gateway(title, msg)
+
     for platform, url in webhooks.items():
         if not url:
+            continue
+
+        # 配置统一出口后，企业微信应用通道取代账号级群机器人 Webhook
+        if platform == "wecom" and WECOM_GATEWAY_ENABLED:
             continue
 
         if platform in SUPPORTED_PLATFORMS:
             _send_with_retry(platform, url, partial(_send_platform, platform, url, msg))
         elif platform in ("sms_phone", "sms_api", "voice_api"):
             _send_generic_webhook(platform, url, title, msg)
+
+
+def _send_wecom_gateway(title: str, msg: str) -> bool:
+    """经 NAS notify 容器发送到企业微信自建应用"""
+    if not WECOM_GATEWAY_ENABLED:
+        return False
+
+    url = f"{WECOM_GATEWAY_URL}/api/v1/notify/{WECOM_GATEWAY_APP_ID}"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {WECOM_GATEWAY_TOKEN}",
+    }
+    payload = {
+        "title": f"⏰ {title or '未命名提醒'}",
+        "content": msg,
+    }
+    try:
+        resp = requests.post(url, json=payload, headers=headers, timeout=10)
+    except requests.RequestException as e:
+        logger.error(f"网络错误 (wecom_gateway): {type(e).__name__}")
+        return False
+    except Exception as e:
+        logger.error(f"推送异常 (wecom_gateway): {type(e).__name__}")
+        return False
+
+    if resp.status_code != 200:
+        logger.error(f"推送失败 (wecom_gateway): HTTP {resp.status_code}")
+        return False
+
+    try:
+        data = resp.json()
+    except ValueError:
+        logger.error("推送失败 (wecom_gateway): 响应不是有效 JSON")
+        return False
+
+    if not isinstance(data, dict) or data.get("code") != 0:
+        error = data.get("msg", "未知错误") if isinstance(data, dict) else "响应格式错误"
+        logger.error(f"推送失败 (wecom_gateway): {error}")
+        return False
+
+    logger.info("推送成功 (wecom_gateway)")
+    return True
 
 
 def _send_platform(platform: str, url: str, msg: str):

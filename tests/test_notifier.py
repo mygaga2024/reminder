@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import datetime
 from unittest.mock import MagicMock, patch, call
-from app.notifier import notify_engine, _send_generic_webhook
+from app.notifier import notify_engine, _send_generic_webhook, _send_wecom_gateway
 from app.notifier import _prune_logs, _repeat_label
 from app.calendar_utils import is_china_workday
 from app.config import TZ_ENV
@@ -43,6 +43,65 @@ class TestNotifyEngine:
         call_args = mock_post.call_args
         assert call_args[0][0] == "https://qyapi.weixin.qq.com/test"
         assert call_args[1]["json"]["msgtype"] == "text"
+
+    @patch('app.notifier.requests.post')
+    def test_notify_prefers_wecom_gateway(self, mock_post):
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"code": 0, "msg": "success"}
+        db = self.make_db({"wecom": "https://legacy.example.com", "dingtalk": "", "lark": ""})
+
+        with patch.multiple(
+            'app.notifier',
+            WECOM_GATEWAY_ENABLED=True,
+            WECOM_GATEWAY_URL='http://notify:7879',
+            WECOM_GATEWAY_APP_ID='6',
+            WECOM_GATEWAY_TOKEN='test-token',
+        ):
+            notify_engine(self.make_reminder(), db, [], MagicMock())
+
+        assert mock_post.call_count == 1
+        call_args = mock_post.call_args
+        assert call_args[0][0] == "http://notify:7879/api/v1/notify/6"
+        assert call_args[1]["headers"]["Authorization"] == "Bearer test-token"
+        assert call_args[1]["json"]["title"] == "⏰ 测试提醒"
+
+    @patch('app.notifier.requests.post')
+    def test_wecom_gateway_failure_does_not_block_other_channels(self, mock_post):
+        gateway_resp = MagicMock(status_code=500)
+        lark_resp = MagicMock(status_code=200)
+        mock_post.side_effect = [gateway_resp, lark_resp]
+        db = self.make_db({
+            "wecom": "https://legacy.example.com",
+            "dingtalk": "",
+            "lark": "https://open.feishu.cn/test",
+        })
+
+        with patch.multiple(
+            'app.notifier',
+            WECOM_GATEWAY_ENABLED=True,
+            WECOM_GATEWAY_URL='http://notify:7879',
+            WECOM_GATEWAY_APP_ID='6',
+            WECOM_GATEWAY_TOKEN='test-token',
+        ):
+            notify_engine(self.make_reminder(), db, [], MagicMock())
+
+        assert mock_post.call_count == 2
+        assert mock_post.call_args_list[0][0][0] == "http://notify:7879/api/v1/notify/6"
+        assert mock_post.call_args_list[1][0][0] == "https://open.feishu.cn/test"
+
+    @patch('app.notifier.requests.post')
+    def test_wecom_gateway_rejects_error_response(self, mock_post):
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"code": 5001, "msg": "send failed"}
+
+        with patch.multiple(
+            'app.notifier',
+            WECOM_GATEWAY_ENABLED=True,
+            WECOM_GATEWAY_URL='http://notify:7879',
+            WECOM_GATEWAY_APP_ID='6',
+            WECOM_GATEWAY_TOKEN='test-token',
+        ):
+            assert _send_wecom_gateway("测试提醒", "正文") is False
 
     @patch('app.notifier.requests.post')
     def test_notify_sends_lark_format(self, mock_post):
