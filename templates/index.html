@@ -244,22 +244,22 @@
 
             <div class="footer-info">
                 <span id="authStatus"></span>
-                Life Reminder v<span id="appVersion">3.2.33</span><br>
+                Life Reminder v<span id="appVersion">3.2.34</span><br>
                 Made with ♥ by mygaga2024
             </div>
         </div>
     </div>
 
     <!-- Bottom Dock -->
-    <div class="dock">
+    <nav class="dock" aria-label="主导航">
         <div class="dock-inner">
-            <button class="dock-btn active" onclick="goTo('home',this)"><i class="fas fa-house"></i><span>首页</span></button>
-            <button class="dock-btn" onclick="goTo('data',this)"><i class="fas fa-clock-rotate-left"></i><span>历史</span></button>
-            <button class="dock-fab" onclick="openSheet('add')"><i class="fas fa-plus"></i></button>
-            <button class="dock-btn" onclick="goTo('logs',this)"><i class="fas fa-terminal"></i><span>日志</span></button>
-            <button class="dock-btn" onclick="goTo('config',this)"><i class="fas fa-gear"></i><span>设置</span></button>
+            <button type="button" class="dock-btn active" onclick="goTo('home',this)" aria-label="首页"><i class="fas fa-house" aria-hidden="true"></i><span>首页</span></button>
+            <button type="button" class="dock-btn" onclick="goTo('data',this)" aria-label="历史"><i class="fas fa-clock-rotate-left" aria-hidden="true"></i><span>历史</span></button>
+            <button type="button" class="dock-fab" onclick="openSheet('add')" aria-label="新建任务"><i class="fas fa-plus" aria-hidden="true"></i></button>
+            <button type="button" class="dock-btn" onclick="goTo('logs',this)" aria-label="日志"><i class="fas fa-terminal" aria-hidden="true"></i><span>日志</span></button>
+            <button type="button" class="dock-btn" onclick="goTo('config',this)" aria-label="设置"><i class="fas fa-gear" aria-hidden="true"></i><span>设置</span></button>
         </div>
-    </div>
+    </nav>
 
     <!-- ═══ Auth Screen (多账号登录 / 注册) ═══ -->
     <div class="auth-screen" id="authScreen">
