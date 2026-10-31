@@ -1437,6 +1437,7 @@ function openSheet(id) {
 function openAbout() {
     const currentVer = S.version || 'unknown';
     const versionHistory = [
+        { version: 'v3.2.33', changes: ['修复企业微信测试推送绕过统一网关、继续使用旧群机器人 Webhook 的问题', '统一网关启用后，测试推送无需填写旧 Webhook 地址'] },
         { version: 'v3.2.32', changes: ['界面细节：备份两项右侧图标统一为「>」，避免下载/上传箭头与左侧图标语义混淆', '导出备份说明文案明确为「下载到本地」'] },
         { version: 'v3.2.31', changes: ['新增安全网：清空全部提醒时自动留档 config.json.preclear_时间戳（保留 5 份）', 'README 新增数据备份与恢复说明、升级前必读提示'] },
         { version: 'v3.2.30', changes: ['移除半成品的微信小程序登录接口 /api/wxlogin', '文档修正：极空间兼容策略始终启用（ZSPACE_COMPAT 为占位项）', 'README 新增 v3.2.19 → v3.2.30 升级说明'] },
