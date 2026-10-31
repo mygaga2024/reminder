@@ -10,7 +10,7 @@ from app.auth import (
     validate_reminder_input, validate_webhook_url
 )
 from app.scheduler import update_scheduler
-from app.notifier import send_test_notification
+from app.notifier import send_test_notification, wecom_gateway_enabled
 from app import users
 
 # 通知记录接口单次返回上限（历史统计仍按全量计算）
@@ -535,10 +535,12 @@ def register_routes(app, db: dict, logs: list, scheduler):
 
                 webhooks = _scope_settings().get("webhooks") or {}
                 url = (payload.get("url") or webhooks.get(channel) or "").strip()
-                if not url:
-                    return jsonify({"error": "请先填写该渠道的 Webhook 地址"}), 400
-                if not validate_webhook_url(url):
-                    return jsonify({"error": "Webhook URL 格式无效"}), 400
+                use_wecom_gateway = channel == "wecom" and wecom_gateway_enabled()
+                if not use_wecom_gateway:
+                    if not url:
+                        return jsonify({"error": "请先填写该渠道的 Webhook 地址"}), 400
+                    if not validate_webhook_url(url):
+                        return jsonify({"error": "Webhook URL 格式无效"}), 400
 
                 ok, message = send_test_notification(channel, url)
                 logger.info(f"测试推送 ({channel}): {message}")

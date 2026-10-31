@@ -717,6 +717,29 @@ class TestWebhookTest:
         assert resp.status_code == 200
         assert mock_post.call_args[0][0] == "https://saved.example.com"
 
+    @patch('app.notifier.requests.post')
+    def test_wecom_test_uses_gateway_without_url(self, mock_post, client):
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"code": 0, "msg": "success"}
+
+        with patch.multiple(
+            'app.notifier',
+            WECOM_GATEWAY_ENABLED=True,
+            WECOM_GATEWAY_URL='http://notify:7879',
+            WECOM_GATEWAY_APP_ID='6',
+            WECOM_GATEWAY_TOKEN='test-token',
+        ):
+            client.post('/api/settings', json={
+                "webhooks": {"wecom": "https://legacy.example.com"}
+            })
+            resp = client.post('/api/settings/test-webhook', json={"channel": "wecom"})
+
+        assert resp.status_code == 200
+        assert "统一网关" in resp.get_json()["message"]
+        assert mock_post.call_count == 1
+        assert mock_post.call_args[0][0] == "http://notify:7879/api/v1/notify/6"
+        assert mock_post.call_args[1]["headers"]["Authorization"] == "Bearer test-token"
+
 
 class TestAccountMaintenance:
     """账号运维：退出其他设备、注销账号"""
